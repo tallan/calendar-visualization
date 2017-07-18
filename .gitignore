@@ -4,3 +4,18 @@ node_modules/
 dist/
 .vscode/
 .api/
+# Pending Release
+assets/
+src/
+style/
+typings/
+.npmignore
+.tfignore
+capabilities.json
+devenv-setup.md
+docs.txt
+package.json
+pbiviz.json
+tsconfig.json
+typings.json
+yarn.lock
