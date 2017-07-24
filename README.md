@@ -1,6 +1,6 @@
 # calendar-visualization
 
-Tallan's Calendar Visual offers an exciting way to display and splice date related data. View the the aggregation of data across a range of dates in a standard calendar format. The visualization offers separate views for year and month, allwoing users to zoom in on date ranges while presenting them clearly and effectively.  
+Tallan's Calendar Visual offers an exciting way to display and splice date related data. View the the aggregation of data across a range of dates in a standard calendar format. The visualization offers separate views for year and month, allowing users to zoom in on date ranges while presenting them clearly and effectively.  
 
 Features include:
 * Standard Calendar Visual Display
