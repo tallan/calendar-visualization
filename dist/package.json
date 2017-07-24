@@ -1,0 +1,17 @@
+{
+    "version": "1.0.0",
+    "author": {"name":"","email":""},
+    "resources": [
+        {
+            "resourceId": "rId0",
+            "sourceType": 5,
+            "file": "resources/CalendarVisualA45056645E4E428B9D26EF971839A6B2.pbiviz.json"
+        }
+    ],
+    "visual": {"name":"CalendarVisual","displayName":"Calendar Visual","guid":"CalendarVisualA45056645E4E428B9D26EF971839A6B2","visualClassName":"Visual","version":"1.0.0","description":"","supportUrl":"","gitHubUrl":""},
+    "metadata": {
+        "pbivizjson": {
+            "resourceId": "rId0"
+        }
+    }  
+}

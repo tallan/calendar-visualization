@@ -1,0 +1,28 @@
+{
+  "visual": {
+    "name": "CalendarVisual",
+    "displayName": "Calendar by Tallan",
+    "guid": "CalendarVisualA45056645E4E428B9D26EF971839A6B2",
+    "visualClassName": "Visual",
+    "version": "1.0.0",
+    "description": "Visualize data over time on a standard calendar with year and month views.",
+    "supportUrl": "https://github.com/tallan/calendar-visualization/issues",
+    "gitHubUrl": "https://github.com/tallan/calendar-visualization"
+  },
+  "apiVersion": "1.6.0",
+  "author": {
+    "name": "Tallan, Inc.",
+    "email": "help@tallan.com"
+  },
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "externalJS": [
+    "node_modules/powerbi-visuals-utils-dataviewutils/lib/index.js",
+    "node_modules/d3/d3.min.js"
+  ],
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "dependencies": "dependencies.json",
+  "stringResources": []
+}

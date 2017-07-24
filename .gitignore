@@ -1,21 +1,7 @@
-node_modules/
+# Temporary Do not include
 .DS_Store
-.tmp
-dist/
 .vscode/
-.api/
-# Pending Release
-assets/
-src/
-style/
-typings/
+# Do not include in GIT
 .npmignore
-.tfignore
-capabilities.json
 devenv-setup.md
 docs.txt
-package.json
-pbiviz.json
-tsconfig.json
-typings.json
-yarn.lock

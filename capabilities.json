@@ -1,0 +1,95 @@
+{
+    "dataRoles": [
+        {
+            "displayName": "Date",
+            "name": "Category",
+            "kind": "Grouping",
+            "description": "Grouping of discrete dates"
+        },
+        {
+            "displayName": "Values",
+            "name": "Y",
+            "kind": "Measure",
+            "description": "Numeric data values"
+        }
+    ],
+    "dataViewMappings": [{
+        "conditions": [
+            { "Category": { "max": 1 }, "Y": { "max": 1 } }
+        ],
+        "categorical": {
+            "categories": {
+                "for": { "in": "Category" }
+            },
+            "values": {
+                "group": {
+                    "by": "Series",
+                    "select": [{ "bind": { "to": "Y" } }],
+                    "dataReductionAlgorithm": { "top": {} }
+                }
+            }
+        }
+    }],
+    "objects": {
+        "cellColor": {
+            "displayName": "Cells color",
+            "properties": {
+                "fill": {
+                    "displayName": "Cell fill",
+                    "type": { 
+                        "fill": { 
+                            "solid": { 
+                                "color": true 
+                            } 
+                        } 
+                    }
+                }
+            }
+        },
+        "dataPoint": {
+            "displayName": "Data colors",
+            "properties": {
+                "defaultColor": {
+                    "displayName": "Default color",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "showAllDataPoints": {
+                    "displayName": "Show all",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "fill": {
+                    "displayName": "Fill",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "fillRule": {
+                    "displayName": "Color saturation",
+                    "type": {
+                        "fill": {}
+                    }
+                },
+                 "fontSize": {
+                    "displayName": "Text Size",
+                    "type": {
+                        "formatting": {
+                            "fontSize": true
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
