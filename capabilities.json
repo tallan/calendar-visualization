@@ -13,35 +13,85 @@
             "description": "Numeric data values"
         }
     ],
-    "dataViewMappings": [{
-        "conditions": [
-            { "Category": { "max": 1 }, "Y": { "max": 1 } }
-        ],
-        "categorical": {
-            "categories": {
-                "for": { "in": "Category" }
-            },
-            "values": {
-                "group": {
-                    "by": "Series",
-                    "select": [{ "bind": { "to": "Y" } }],
-                    "dataReductionAlgorithm": { "top": {} }
+    "dataViewMappings": [
+        {
+            "conditions": [
+                {
+                    "Category": {
+                        "max": 1
+                    },
+                    "Y": {
+                        "max": 1
+                    }
+                }
+            ],
+            "categorical": {
+                "categories": {
+                    "for": {
+                        "in": "Category"
+                    }
+                },
+                "values": {
+                    "group": {
+                        "by": "Series",
+                        "select": [
+                            {
+                                "bind": {
+                                    "to": "Y"
+                                }
+                            }
+                        ],
+                        "dataReductionAlgorithm": {
+                            "top": {}
+                        }
+                    }
                 }
             }
         }
-    }],
+    ],
     "objects": {
-        "cellColor": {
-            "displayName": "Cells color",
+        "calendar": {
+            "displayName": "Calendar Configurations",
             "properties": {
-                "fill": {
-                    "displayName": "Cell fill",
-                    "type": { 
-                        "fill": { 
-                            "solid": { 
-                                "color": true 
-                            } 
-                        } 
+                "weekStartDay": {
+                    "displayName": "Week Start",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "0",
+                                "displayName": "Sunday"
+                            },
+                            {
+                                "value": "1",
+                                "displayName": "Monday"
+                            },
+                            {
+                                "value": "2",
+                                "displayName": "Tuesday"
+                            },
+                            {
+                                "value": "3",
+                                "displayName": "Wednesday"
+                            },
+                            {
+                                "value": "4",
+                                "displayName": "Thursday"
+                            },
+                            {
+                                "value": "5",
+                                "displayName": "Friday"
+                            },
+                            {
+                                "value": "6",
+                                "displayName": "Saturday"
+                            }
+                        ]
+                    }
+                },
+                "numberColumns": {
+                    "displayName": "Columns",
+                    "type": {
+                        "numeric": true
                     }
                 }
             }
@@ -58,35 +108,70 @@
                             }
                         }
                     }
-                },
-                "showAllDataPoints": {
-                    "displayName": "Show all",
+                }
+            }
+        },
+        "diverging": {
+            "displayName": "Diverging colors",
+            "properties": {
+                "diverging": {
+                    "displayName": "Diverging",
                     "type": {
                         "bool": true
                     }
                 },
-                "fill": {
-                    "displayName": "Fill",
+                "minColor": {
+                    "displayName": "Minimum",
                     "type": {
                         "fill": {
                             "solid": {
-                                "color": true
+                                "color": {
+                                    "nullable": true
+                                }
                             }
                         }
                     }
                 },
-                "fillRule": {
-                    "displayName": "Color saturation",
+                "centerColor": {
+                    "displayName": "Center",
                     "type": {
-                        "fill": {}
+                        "fill": {
+                            "solid": {
+                                "color": {
+                                    "nullable": true
+                                }
+                            }
+                        }
                     }
                 },
-                 "fontSize": {
-                    "displayName": "Text Size",
+                "maxColor": {
+                    "displayName": "Maximum",
                     "type": {
-                        "formatting": {
-                            "fontSize": true
+                        "fill": {
+                            "solid": {
+                                "color": {
+                                    "nullable": true
+                                }
+                            }
                         }
+                    }
+                },
+                "minValue": {
+                    "displayName": "Minimum",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "centerValue": {
+                    "displayName": "Center",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "maxValue": {
+                    "displayName": "Maximum",
+                    "type": {
+                        "numeric": true
                     }
                 }
             }

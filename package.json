@@ -5,6 +5,7 @@
     "powerbi-visuals-utils-dataviewutils": "1.0.1"
   },
   "dependencies": {
-    "d3": "^3.5.5"
+    "d3": "^3.5.5",
+    "underscore": "^1.8.3"
   }
 }

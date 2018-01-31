@@ -1,127 +1,381 @@
 module powerbi.extensibility.visual {
 
-    export class Visual implements IVisual {
+    function visualTransform(options: VisualUpdateOptions, host: IVisualHost): CalendarViewModel {
+        let dataViews = options.dataViews;
+        // Default Config
+        let defaultConfig: CalendarConfigurations = {
+            dataPoint: { solid: { color: '#01B8AA' } },
+            weekStartDay: 0, // Sunday
+            scrollDirection: 0,
+            numberColumns: null,
+            defaultNumberColumns: 3,
+            numberRows: 0,
+            yearView: false,
+            diverging: {
+                diverging: false,
+                minColor: { solid: { color: null } },
+                centerColor: { solid: { color: null } },
+                maxColor: { solid: { color: null } },
+                minValue: null,
+                centerValue: null,
+                maxValue: null
+            }
+        };
 
+        // Default View Model
+        let viewModel: CalendarViewModel = {
+            dataPoints: [],
+            yearDataPoints: [],
+            configurations: <CalendarConfigurations>{},
+            dayIndexingArray: [] as DayConfiguation[],
+            minimumDate: new Date("January 1, 1900 00:00:00"),
+            maximumDate: new Date("January 1, 1900 00:00:00"),
+        }
+
+        if (!dataViews
+            || !dataViews[0]
+            || !dataViews[0].categorical
+            || !dataViews[0].categorical.categories
+            || !dataViews[0].categorical.categories[0].source
+            || !dataViews[0].categorical.values
+            || dataViews[0].categorical.categories[0].values.length == 0) {
+            return viewModel;
+        }
+
+        let objects = dataViews[0].metadata.objects;
+        // Set Configurations
+        let calendarConfig: CalendarConfigurations = {
+            dataPoint: getValue<Fill>(objects, 'dataPoint', 'defaultColor', defaultConfig.dataPoint),
+            weekStartDay: getValue<number>(objects, 'calendar', 'weekStartDay', defaultConfig.weekStartDay),
+            scrollDirection: 0, //getValue<number>(objects, 'calendar', 'scrollDirection', defaultConfig.scrollDirection),
+            numberColumns: getValue<number>(objects, 'calendar', 'numberColumns', defaultConfig.numberColumns),
+            defaultNumberColumns: 3,
+            numberRows: 0, //getValue<number>(objects, 'calendar', 'numberRows', defaultConfig.numberRows),
+            yearView: false, //getValue<boolean>(objects, 'calendar', 'yearView', defaultConfig.yearView),
+            diverging: {
+                diverging: getValue<boolean>(objects, 'diverging', 'diverging', defaultConfig.diverging.diverging),
+                minColor: getValue<Fill>(objects, 'diverging', 'minColor', defaultConfig.diverging.minColor),
+                centerColor: getValue<Fill>(objects, 'diverging', 'centerColor', defaultConfig.diverging.centerColor),
+                maxColor: getValue<Fill>(objects, 'diverging', 'maxColor', defaultConfig.diverging.maxColor),
+                minValue: getValue<number>(objects, 'diverging', 'minValue', defaultConfig.diverging.minValue),
+                centerValue: getValue<number>(objects, 'diverging', 'centerValue', defaultConfig.diverging.centerValue),
+                maxValue: getValue<number>(objects, 'diverging', 'maxValue', defaultConfig.diverging.maxValue),
+            }
+        }
+        viewModel.configurations = calendarConfig;
+        let configurations = calendarConfig;
+        viewModel.dayIndexingArray = getDayConfigurationArray(calendarConfig.weekStartDay);
+
+        // Get Data Point Color
+        let dataPointColor = configurations.dataPoint.solid.color as string;
+
+        const dates: Date[] = dataViews[0].categorical.categories[0].values as Date[];
+        const values: number[] = dataViews[0].categorical.values[0].values as number[];
+        let calendarDataPoints: CalendarDataPoint[] = [];
+
+        // Get Minimum and Maximum Values and dates
+        let minValue = d3.min(values, function (d) { return d; });
+        let maxValue = d3.max(values, function (d) { return d; });
+        let minDateDataPoint = d3.min(dates, function (d) { return d; });
+        viewModel.minimumDate = new Date(minDateDataPoint.getFullYear(), minDateDataPoint.getMonth(), 1);
+        let maxDateDataPoint = d3.max(dates, function (d) { return d; });
+        viewModel.maximumDate = new Date(maxDateDataPoint.getFullYear(), maxDateDataPoint.getMonth() + 1, 0);
+        let maxRangeDate = new Date(maxDateDataPoint.getFullYear(), maxDateDataPoint.getMonth() + 1, 1);
+        let timeSpan: Date[] = d3.time.day.range(viewModel.minimumDate, maxRangeDate);
+        let difference: Date[] = differenceOfArrays(dates, timeSpan);
+
+        // setup colors for each date depending on configurations
+        let color = getColorFromValues(minValue, maxValue, configurations);
+
+        // Set Data Points from Power BI
+        for (let i = 0; i < dates.length; i++) {
+            const selectionId: visuals.ISelectionId = host.createSelectionIdBuilder()
+                .withCategory(dataViews[0].categorical.categories[0], i)
+                .createSelectionId();
+            const dataPoint: CalendarDataPoint = {
+                color: color(values[i]),
+                date: dates[i],
+                value: values[i],
+                selectionId: selectionId,
+                month: dates[i].getMonth(),
+                year: dates[i].getFullYear()
+            };
+            calendarDataPoints.push(dataPoint);
+        }
+
+        // Add Zero Value Date Points
+        for (let i = 0; i < difference.length; i++) {
+            let differenceDate = new Date(difference[i]);
+            const dataPoint: CalendarDataPoint = {
+                color: color(0),
+                date: differenceDate,
+                value: 0,
+                selectionId: null,
+                month: differenceDate.getMonth(),
+                year: differenceDate.getFullYear()
+            };
+            calendarDataPoints.push(dataPoint);
+        }
+
+        // TESTING YEAR VIEW STUFF KC //////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // let groupDataPointsByYear = _.groupBy(calendarDataPoints, function (d) { return d.date.getFullYear(); });
+        // let yearIndex = 1;
+        // let yearValueArray: number[] = [];
+        // let tempYearValue: YearDataPoint[] = [];
+        // for (let year in groupDataPointsByYear) {
+        //     let yearDataPoints = groupDataPointsByYear[year];
+        //     let yearValue = _.reduce(yearDataPoints, function (memo, ydp) {
+        //         return memo + ydp["value"];
+        //     }, 0);
+        //     yearValueArray.push(yearValue);
+        //     // Create Year Value
+        //     tempYearValue.push({
+        //         year: parseInt(year),
+        //         value: yearValue,
+        //         yearIndex: yearIndex,
+        //         color: 'white'
+        //     });
+        //     yearIndex += 1;
+        // }
+        // // TEMPORARY
+        // // TODO - NEED TO HANDLE EMPTY YEARS
+        // let yearMinValue: number = _.min(yearValueArray);
+        // let yearMaxValue: number = _.max(yearValueArray);
+        // let yearColor = getColorFromValues(yearMinValue, yearMaxValue, configurations);
+        // for (var key in tempYearValue) {
+        //     let obj: YearDataPoint = tempYearValue[key];
+        //     obj.color = yearColor(obj.value);
+        //     viewModel.yearDataPoints.push(obj);
+        // }
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        // Set View Models Data Points
+        viewModel.dataPoints = calendarDataPoints;
+
+        return viewModel;
+    }
+
+    function getColorFromValues(min: number, max: number, configurations: CalendarConfigurations) {
+        let color = d3.scale.linear<string>();
+        // setup colors for each date depending on configurations
+        if (configurations.diverging.diverging) {
+            // Get Diverging Values
+            let centerDivergingValue = configurations.diverging.centerValue;
+            let minDivergingValue = configurations.diverging.minValue;
+            let maxDivergingValue = configurations.diverging.maxValue;
+            let divergingColor = d3.scale.linear<string>();
+            color.domain([minDivergingValue, centerDivergingValue, maxDivergingValue])
+                .range([configurations.diverging.minColor.solid.color, configurations.diverging.centerColor.solid.color, configurations.diverging.maxColor.solid.color]);
+        }
+        else {
+            color.domain([min, max]).range([Color[Color.WHITE], configurations.dataPoint.solid.color]);
+        }
+        return color;
+    }
+
+    function getDayConfigurationArray(weekStartDay: number): DayConfiguation[] {
+        const dayArray: (number | string)[][] = [[0, 'Su'], [1, 'Mo'], [2, 'Tu'], [3, 'We'], [4, 'Th'], [5, 'Fr'], [6, 'Sa']];
+        let rightArray = dayArray;
+        let leftArray = dayArray.splice(weekStartDay);
+        let configuredArray = leftArray.concat(rightArray);
+        let configuredDayIndexArray: (DayConfiguation)[] = [];
+        for (let i = 0; i <= 6; i++) {
+            let dayConfig: DayConfiguation = { actualDayIndex: Number(configuredArray[i][0]), configuredDayIndex: i, dayLabel: String(configuredArray[i][1]) };
+            configuredDayIndexArray.push(dayConfig);
+        }
+        return configuredDayIndexArray
+    }
+
+    function differenceOfArrays(test1, test2) {
+        var helpArray = [];
+        var difference = [];
+        for (var i = 0; i < test1.length; i++) {
+            helpArray[test1[i]] = true;
+        }
+        for (var j = 0; j < test2.length; j++) {
+            if (helpArray[test2[j]]) {
+                delete helpArray[test2[j]];
+            }
+            else {
+                helpArray[test2[j]] = true;
+            }
+        }
+        for (var k in helpArray) {
+            difference.push(k);
+        }
+        return difference;
+    }
+
+    function getNumberOfColumnsByRow(numberOfRows: number, numberOfMonths: number) {
+        let numberOfColumns: number = 0;
+        let monthsOverRows = numberOfMonths / numberOfRows;
+        // See if it was an even divide
+        if (monthsOverRows - Math.floor(monthsOverRows) == 0) {
+            numberOfColumns = monthsOverRows;
+        }
+        else {
+            numberOfColumns = Math.ceil(monthsOverRows);
+        }
+        return numberOfColumns;
+    }
+
+    function getNumberOfRowsByColumn(numberOfColumns: number, numberOfMonths: number) {
+        let numberOfRows: number = 0;
+        let monthsOverColumns = numberOfMonths / numberOfColumns;
+        // See if it was an even divide
+        if (monthsOverColumns - Math.floor(monthsOverColumns) == 0) {
+            numberOfRows = monthsOverColumns;
+        }
+        else {
+            numberOfRows = Math.ceil(monthsOverColumns);
+        }
+        return numberOfRows;
+    }
+
+    function getMonthDiferrence(startDate: Date, endDate: Date) {
+        var year1 = startDate.getFullYear();
+        var year2 = endDate.getFullYear();
+        var month1 = startDate.getMonth();
+        var month2 = endDate.getMonth();
+        if (month1 === 0) { //Have to take into account
+            month1++;
+            month2++;
+        }
+        return (year2 - year1) * 12 + (month2 - month1) + 1;
+    }
+
+    function getLayoutConfiguration(viewPortWidth: number, viewPortHeight: number, configurations: CalendarConfigurations, minimumDate: Date, maximumDate: Date, zoomLevel: ZoomLevel) {
+        let numberOfMonths = zoomLevel == ZoomLevel.ALL ? getMonthDiferrence(minimumDate, maximumDate) : 1;
+        let numberOfColumns = configurations.numberColumns != null ? configurations.numberColumns : configurations.defaultNumberColumns;
+        let layoutConfig: LayoutConfiguration = {
+            horizontalMonthPadding: 20,
+            verticalMonthPadding: 20,
+            calendarDateRectSize: zoomLevel == ZoomLevel.ALL ? 15 : 50,
+            monthTitleRatio: 0.6,
+            numberOfColumns: configurations.scrollDirection == 0 ? numberOfColumns : getNumberOfColumnsByRow(configurations.numberRows, numberOfMonths),
+            numberOfRows: configurations.scrollDirection == 1 ? configurations.numberRows : getNumberOfRowsByColumn(numberOfColumns, numberOfMonths),
+            numberOfMonths: numberOfMonths,
+            svgWidth: 0,
+            svgHeight: 0
+        };
+
+        if (zoomLevel == ZoomLevel.ALL) {
+            if (configurations.scrollDirection == 0) {
+                let verticalScrollRectSize = viewPortWidth / ((8.33 * layoutConfig.numberOfColumns) + 1.33); // View Port Width / (Month Size + Padding) 
+                layoutConfig.calendarDateRectSize = verticalScrollRectSize < 15 ? 15 : verticalScrollRectSize;
+                layoutConfig.horizontalMonthPadding = layoutConfig.calendarDateRectSize * 1.33;
+                layoutConfig.verticalMonthPadding = layoutConfig.calendarDateRectSize * 1.33;
+                layoutConfig.svgWidth = ((layoutConfig.numberOfColumns + 1) * layoutConfig.horizontalMonthPadding) + (layoutConfig.numberOfColumns * layoutConfig.calendarDateRectSize * 7) - 20;
+                layoutConfig.svgHeight = ((layoutConfig.numberOfRows + 1) * layoutConfig.verticalMonthPadding) + (layoutConfig.numberOfRows * layoutConfig.calendarDateRectSize * 7) + (layoutConfig.numberOfRows * layoutConfig.calendarDateRectSize) - layoutConfig.verticalMonthPadding;
+            }
+            else if (configurations.scrollDirection == 1) {
+                let horizontalScrollRectSize = viewPortHeight / ((layoutConfig.numberOfRows * (7 + layoutConfig.monthTitleRatio + 1 + 1.33)) + 1.33);
+                layoutConfig.calendarDateRectSize = horizontalScrollRectSize < 15 ? 15 : horizontalScrollRectSize;
+                layoutConfig.horizontalMonthPadding = layoutConfig.calendarDateRectSize * 1.33;
+                layoutConfig.verticalMonthPadding = layoutConfig.calendarDateRectSize * 1.33;
+                layoutConfig.svgWidth = ((layoutConfig.numberOfColumns + 1) * layoutConfig.horizontalMonthPadding) + (layoutConfig.numberOfColumns * layoutConfig.calendarDateRectSize * 7) - 20;
+                layoutConfig.svgHeight = ((layoutConfig.numberOfRows + 1) * layoutConfig.verticalMonthPadding) + (layoutConfig.numberOfRows * layoutConfig.calendarDateRectSize * 7) + (layoutConfig.numberOfRows * layoutConfig.calendarDateRectSize) - layoutConfig.verticalMonthPadding;
+            }
+        }
+        else {
+            layoutConfig.svgWidth = (layoutConfig.horizontalMonthPadding * 2) + (7 * layoutConfig.calendarDateRectSize) + 20;
+            layoutConfig.svgHeight = (layoutConfig.verticalMonthPadding * 2) + (7 * layoutConfig.calendarDateRectSize) + (layoutConfig.monthTitleRatio * layoutConfig.calendarDateRectSize) - 50;
+        }
+        return layoutConfig;
+    }
+
+    function getYearViewLayoutConfiguration(viewPortWidth: number, viewPortHeight: number, configurations: CalendarConfigurations, numberOfYears: number) {
+        let numberOfColumns = configurations.numberColumns != null ? configurations.numberColumns : configurations.defaultNumberColumns;
+        let layoutConfig: YearViewLayoutConfiguration = {
+            svgPadding: 30,
+            yearRectSize: 100,
+            numberOfColumns: configurations.scrollDirection == 0 ? numberOfColumns : getNumberOfColumnsByRow(configurations.numberRows, numberOfYears),
+            numberOfRows: configurations.scrollDirection == 1 ? configurations.numberRows : getNumberOfRowsByColumn(numberOfColumns, numberOfYears),
+            numberOfYears: numberOfYears,
+            svgWidth: 500,
+            svgHeight: 500,
+            yearTitleRatio: 0.18
+        };
+
+        if (configurations.scrollDirection == 0) {
+            let verticalScrollRectSize = (viewPortWidth - (2 * layoutConfig.svgPadding)) / (layoutConfig.numberOfColumns);
+            layoutConfig.yearRectSize = verticalScrollRectSize < 100 ? 100 : verticalScrollRectSize;
+            layoutConfig.svgWidth = (layoutConfig.yearRectSize * layoutConfig.numberOfColumns) + (2 * layoutConfig.svgPadding);
+            layoutConfig.svgHeight = (layoutConfig.yearRectSize * layoutConfig.numberOfRows) + (2 * layoutConfig.svgPadding);
+        }
+
+        return layoutConfig;
+    }
+
+    export class Visual implements IVisual {
         private readonly host: IVisualHost;
         private readonly htmlElement: HTMLElement;
-        private readonly touchTimeoutId: number = null;
         private readonly stateManager: StateManager;
-        private cellColorTop: string = DEFAULT_CELL_COLOR_TOP;
-        private cellSizeAllZoom: number;
-        private cellSizeMonthZoom: number;
+        private selectionManager: ISelectionManager;
+        private selectionIdBuilder: ISelectionIdBuilder;
+        private tooltipServiceWrapper: ITooltipServiceWrapper;
+        private calendarSVG: d3.Selection<SVGElement>;
+        private calendarContainerGroup: d3.Selection<SVGElement>;
+        private calendarConfiguration: CalendarConfigurations;
+        private viewModel: CalendarViewModel;
+        private resizingLayoutHelper: LayoutConfiguration;
+        private yearViewLayoutHelper: YearViewLayoutConfiguration;
 
         constructor(options: VisualConstructorOptions) {
             this.host = options.host;
             this.htmlElement = options.element;
+
+            // Construct Tallan Preview -- http://community.powerbi.com/t5/Developer/Changing-the-Default-Watermark-in-a-Custom-Visual/m-p/333695/highlight/true#M9874
+            //this.constructTallanPreview(options);
+
             this.stateManager = new StateManager(this.host.createSelectionManager());
+            this.selectionManager = this.host.createSelectionManager();
+            this.selectionIdBuilder = options.host.createSelectionIdBuilder();
+            this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
+
+            // For scrollable
+            options.element.style.overflow = 'auto';
+
+            let svg = this.calendarSVG = d3.select(options.element)
+                .append('svg')
+                .classed('calendarSVG', true);
+            this.calendarContainerGroup = svg.append('g')
+                .classed('calendarContainer', true);
         }
 
         update(options: VisualUpdateOptions) {
-            // update chosen cell color if needed
-            const dataView = options.dataViews[0];
-            if (dataView.metadata && dataView.metadata.objects) {
-                // as defined in capabilities.json
-                const cellColorObj: DataViewObject = dataView.metadata.objects['cellColor'];
-                if (cellColorObj && cellColorObj['fill'])
-                    this.cellColorTop = (cellColorObj['fill'] as Fill).solid.color;
-            }
+            d3.selectAll('.calendarContainer').remove();
+            let svg = this.calendarSVG;
+            this.calendarContainerGroup = svg.append('g')
+                .classed('calendarContainer', true);
 
-            // 
-            // BUILD VIEW MODEL
-            //
+            // Build View Model
             const dataViews = options.dataViews;
-            const viewModel: BetterCalendarViewModel = {
-                dateValuesByYear: {} as { number: DateValue[] },
-                yearsList: [],
-                dateValueTable: {} as { string: DateValue },
-                //eventOriginatedInVisual: false
+            let viewModel: CalendarViewModel = this.viewModel = visualTransform(options, this.host);
+            let configurations: CalendarConfigurations = this.calendarConfiguration = viewModel.configurations;
+            // Render Year View
+            if (configurations.yearView) {
+                this.yearViewLayoutHelper = getYearViewLayoutConfiguration(options.viewport.width, options.viewport.height, configurations, viewModel.yearDataPoints.length);
+                this.yearView(viewModel);
             }
-
-            if (!dataViews || !dataViews[0] || !dataViews[0].categorical
-                || !dataViews[0].categorical.values || !dataViews[0].categorical.categories
-                || !dataViews[0].categorical.categories[0].source) {
-                // invalid dataViews
-                return viewModel;
-            }
-
-            const dates: Date[] = dataViews[0].categorical.categories[0].values as Date[];
-            const values: number[] = dataViews[0].categorical.values[0].values as number[];
-
-            // build DateValue objects for each date in data
-            let maxValue = 0;  // track min and max values for dates
-            let minValue = 0;
-            for (let i = 0; i < dates.length; i++) {
-                // create DateValue out of date
-                const selectionId: visuals.ISelectionId = this.host.createSelectionIdBuilder()
-                    .withCategory(dataViews[0].categorical.categories[0], i)
-                    .createSelectionId()
-                const dateValue: DateValue = {
-                    color: '',
-                    date: dates[i],
-                    value: values[i],
-                    tooltipDataItems: [],
-                    selectionId: selectionId
-                };
-
-                // index dateValue by year
-                const year = dateValue.date.getFullYear();
-                if (viewModel.dateValuesByYear[year] === undefined) {
-                    viewModel.dateValuesByYear[year] = [] as DateValue[];
+            else {
+                // Render appropriate Zoom level
+                let currentZoomLevel = this.stateManager.getZoomLevel();
+                let layoutConfiguration: LayoutConfiguration = this.resizingLayoutHelper = getLayoutConfiguration(options.viewport.width, options.viewport.height, configurations, viewModel.minimumDate, viewModel.maximumDate, currentZoomLevel);
+                if (currentZoomLevel === ZoomLevel.ALL) {
+                    this.renderAllZoom(options, viewModel);
                 }
-                viewModel.dateValuesByYear[year].push(dateValue);
+                else if (currentZoomLevel == ZoomLevel.MONTH) {
+                    this.renderMonthZoom(options, viewModel, this.stateManager.getSelectedMonth(), this.stateManager.getSelectedYear());
+                }
+            }
 
-                // a model for the date's tooltip
-                dateValue.tooltipDataItems.push({
-                    displayName: d3.time.format('%Y-%m-%d')(dates[i]),
-                    value: '' + values[i],
-                    color: null,
-                    header: null
+            // Select all rects with selected-rect class
+            d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
+                .each(function () {
+                    // Move selection to front
+                    this.parentNode.appendChild(this);
                 });
-
-                // add to dictionary
-                viewModel.dateValueTable[dateValue.date.toString()] = dateValue;
-
-                // update max and min values
-                if (i == 0 || minValue > dateValue.value)
-                    minValue = dateValue.value;
-                if (i == 0 || maxValue < dateValue.value)
-                    maxValue = dateValue.value;
-            }
-
-            // setup colors for each date
-            const ratio = 1 / (maxValue - minValue);
-            const r2 = parseInt(this.cellColorTop.substr(1, 2), 16);
-            const g2 = parseInt(this.cellColorTop.substr(3, 2), 16);
-            const b2 = parseInt(this.cellColorTop.substr(5, 2), 16);
-            const r1 = parseInt(DEFAULT_CELL_COLOR_BOT.substr(1, 2), 16);
-            const g1 = parseInt(DEFAULT_CELL_COLOR_BOT.substr(3, 2), 16);
-            const b1 = parseInt(DEFAULT_CELL_COLOR_BOT.substr(5, 2), 16);
-            for (let year in viewModel.dateValuesByYear) {  // iterating over keys (ie years)
-                const dateValues: DateValue[] = viewModel.dateValuesByYear[year];
-                for (let i = 0; i < dateValues.length; i++) {
-                    const percent = (dateValues[i].value - minValue) * ratio;
-                    const resultRed = Math.abs(r1 + percent * (r2 - r1));
-                    const resultGreen = Math.abs(g1 + percent * (g2 - g1));
-                    const resultBlue = Math.abs(b1 + percent * (b2 - b1));
-
-                    const rgb = resultBlue | (resultGreen << 8) | (resultRed << 16);
-                    dateValues[i].color = '#' + (0x1000000 + rgb).toString(16).slice(1);
-                }
-            }
-
-            // build years list
-            for (let year in viewModel.dateValuesByYear)
-                viewModel.yearsList.push(parseInt(year));
-            viewModel.yearsList.sort();
-
-            //
-            // RENDERING
-            // 
-            const currentZoomLevel = this.stateManager.getZoomLevel();
-            if (currentZoomLevel === ZoomLevel.ALL)
-                this.renderAllZoom(options, viewModel);
-            else if (currentZoomLevel == ZoomLevel.MONTH)
-                this.renderMonthZoom(options, viewModel);
         }
 
         /** This function gets called for each of the objects defined in the capabilities 
@@ -130,21 +384,59 @@ module powerbi.extensibility.visual {
          * Objects and properties need to be defined in capabilities.json
          * For example, when you choose a color for the cells in paintroller menu, 
          * this will be called. */
-        enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions)
-            : VisualObjectInstance[] {
+        enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstance[] {
+            let objectName = options.objectName;
             const instances: VisualObjectInstance[] = [];
-            switch (options.objectName) {
-                case 'cellColor':
-                    const cellColor = {
-                        objectName: 'cellColor',
-                        displayName: 'Cells color',
+            switch (objectName) {
+                case 'diverging':
+                    instances.push({
+                        objectName: objectName,
                         selector: null,
                         properties: {
-                            // I think this updates the chosen cell color under the paint-roller menu
-                            fill: this.cellColorTop
+                            diverging: this.calendarConfiguration.diverging.diverging,
+                            minColor: this.calendarConfiguration.diverging.minColor,
+                            centerColor: this.calendarConfiguration.diverging.centerColor,
+                            maxColor: this.calendarConfiguration.diverging.maxColor,
+                            minValue: this.calendarConfiguration.diverging.minValue,
+                            centerValue: this.calendarConfiguration.diverging.centerValue,
+                            maxValue: this.calendarConfiguration.diverging.maxValue
+                        }
+                    })
+                    break;
+                case 'dataPoint':
+                    const dataPoint = {
+                        objectName: objectName,
+                        selector: null,
+                        properties: {
+                            defaultColor: this.calendarConfiguration.dataPoint
                         }
                     }
-                    instances.push(cellColor);
+                    instances.push(dataPoint);
+                    break;
+                case 'calendar':
+                    instances.push({
+                        objectName: objectName,
+                        selector: null,
+                        properties: {
+                            weekStartDay: this.calendarConfiguration.weekStartDay,
+                            yearView: this.calendarConfiguration.yearView,
+                            scrollDirection: this.calendarConfiguration.scrollDirection
+                        }
+                    })
+                    if (this.calendarConfiguration.scrollDirection == 1 /*Horizontal - rows*/) {
+                        instances.push({
+                            objectName: objectName,
+                            selector: null,
+                            properties: { numberRows: this.calendarConfiguration.numberRows }
+                        });
+                    }
+                    else {
+                        instances.push({
+                            objectName: objectName,
+                            selector: null,
+                            properties: { numberColumns: this.calendarConfiguration.numberColumns }
+                        });
+                    }
                     break;
             }
             return instances;
@@ -153,168 +445,246 @@ module powerbi.extensibility.visual {
         /**********************************************************************
          *                             ALL ZOOM                               *
          **********************************************************************/
-        private renderAllZoom(options: VisualUpdateOptions, viewModel: BetterCalendarViewModel) {
-            if (viewModel.yearsList.length == 0)
+        private renderAllZoom(options: VisualUpdateOptions, viewModel: CalendarViewModel) {
+            if (viewModel.dataPoints.length == 0) {
                 return;
-
-            const startYear: number = viewModel.yearsList[0];
-            const endYear: number = viewModel.yearsList[viewModel.yearsList.length - 1];
-
-            // svg dimensions bound by viewport
-            const numRowsOfMonths = 4;
-            const widthTrim = 10;  // prevent float issue
-            const svgWidth = (viewModel.yearsList.length === 1)
-                ? options.viewport.width - widthTrim
-                : options.viewport.width / 2 - widthTrim;
-
-            // cell size, constrain it by the current width of the visual's viewport
-            this.cellSizeAllZoom = ((svgWidth - 20) - (MONTH_VERTICAL_PAD_ALL_ZOOM * numRowsOfMonths)) /
-                (NUM_DAYS_PER_WEEK * NUM_MONTHS_PER_ROW);
-
-            const svgHeight = (numRowsOfMonths * (MAX_NUM_WEEKS_A_MONTH * this.cellSizeAllZoom + MONTH_HORIZONTAL_PAD_ALL_ZOOM))
-                + TOP_PAD_ALL_ZOOM + 10;
-
-            const body: d3.Selection<any> = d3.select(this.htmlElement);
-            body.selectAll('svg').remove();
-
-            const svgGroup: d3.Selection<number> = body.selectAll('svg')
-                .data(d3.range(startYear, endYear + 1))
-                .enter().append('svg')
-                .classed('svgYear', true)
-                .text((d) => { return d; })
-                .attr('width', svgWidth)
-                .attr('height', svgHeight);
-
-            // render group container for each year
-            const yearGroup = svgGroup.append('g')
-                .classed('year', true)
-                .attr('transform', 'translate(30,20)');  // offsets
-
-            // year labels 
-            yearGroup.append('text')
-                .style('text-anchor', 'middle')
-                .attr('font-size', 20)
-                .text((year) => { return `${year}`; });
-
-            // <g> for all months
-            const monthGroup: d3.Selection<any> = yearGroup.selectAll('g')
-                .data((year: number) => {
-                    const months = [];
-                    for (let i = Month.JAN; i <= Month.DEC; i++) {
-                        const datum: { month: Month, year: number } = {
-                            'month': i as Month,
-                            'year': year
-                        };
-                        months.push(datum);
-                    }
-                    return months;
-                })
-                .enter().append('g')
-                .classed('month', true)
-                .attr('fill', 'none')
-                .attr('stroke', '#bbb')
-                .attr('transform', (datum) => {
-                    // set x,y offsets for each month <g>
-                    const col = datum['month'] % 3;
-                    const row = Math.floor(datum['month'] / 3);
-                    const x = (col * this.cellSizeAllZoom * NUM_DAYS_PER_WEEK) + (col * MONTH_VERTICAL_PAD_ALL_ZOOM);
-                    const y = (row * this.cellSizeAllZoom * MAX_NUM_WEEKS_A_MONTH) + (row * MONTH_HORIZONTAL_PAD_ALL_ZOOM) + TOP_PAD_ALL_ZOOM;
-                    return `translate(${x}, ${y})`;
-                });
-
-            // labeling
-            const dayY = '13';
-            const monthFontSize = this.cellSizeAllZoom * 0.705
-            const dayFontSize = this.cellSizeAllZoom * 0.5882
-            // months
-            var self = this;
-            monthGroup.append('text')
-                .text((datum) => { return `${Month[datum.month]} ${datum.year}`; })
-                .attr('x', '30')
-                .style('text-anchor', 'start')
-                .attr('font-size', monthFontSize)
-                .on('mouseover', function () { self.addMonthHoverStyling.call(this, self.cellColorTop); })
-                .on('mouseout', this.removeMonthHoverStyling)
-                .on('click', (datum: { month: Month, year: number }) => {
-                    // GO TO MONTH ZOOM
-                    this.stateManager.clearSelections();
-                    this.stateManager.selectMonth(viewModel, datum.month, datum.year);
-                    this.renderMonthZoom(options, viewModel);
-                });
-            // days
-            const dayXCoordTable = this.getDayLabelXCoordTable(ZoomLevel.ALL, WEEK_FORMAT);
-            for (let dayXCoord of dayXCoordTable) {
-                monthGroup.append('text')
-                    .text(dayXCoord[0])
-                    .attr('x', dayXCoord[1]).attr('y', dayY)
-                    .style('text-anchor', 'middle')
-                    .attr('font-size', dayFontSize);
             }
 
-            // <rect> cells for each day per month
-            const rectGroup: d3.Selection<Date> = monthGroup
-                .append('g')
-                .classed('unselected', true)
-                .selectAll('rect')
-                .data((datum: { month: Month, year: number }) => {
-                    const start = new Date(datum['year'], datum['month'], 1);
-                    const end = new Date(datum['year'], datum['month'] + 1, 1);
-                    return d3.time.days(start, end);
+            // Clear SVG
+            d3.selectAll('.calendarContainer').remove();
+            let svg = this.calendarSVG;
+            this.calendarContainerGroup = svg.append('g')
+                .classed('calendarContainer', true);
+
+            const minDate: Date = viewModel.minimumDate;
+            const maxDate: Date = viewModel.maximumDate;
+            let configNumberOfColumns = viewModel.configurations.numberColumns;
+            let configNumberOfRows = viewModel.configurations.numberRows;
+            let scrollDirection = viewModel.configurations.scrollDirection;
+            let numberOfMonths: number = this.resizingLayoutHelper.numberOfMonths;
+            this.resizingLayoutHelper = getLayoutConfiguration(options.viewport.width, options.viewport.height, viewModel.configurations, viewModel.minimumDate, viewModel.maximumDate, ZoomLevel.ALL);
+
+            let actualNumberOfColumns = this.resizingLayoutHelper.numberOfColumns;
+            let actualNumberOfRows = this.resizingLayoutHelper.numberOfRows;
+
+            // Render Calendar Month
+            let startMonth, iterateMonth = viewModel.minimumDate.getMonth();
+            let startYear, iterateYear = viewModel.minimumDate.getFullYear();
+            let endMonth = viewModel.maximumDate.getMonth();
+            let endYear = viewModel.maximumDate.getFullYear();
+            let endLoopMonth = endMonth + 1 != 12 ? endMonth + 1 : 0;
+            let endLoopYear = endLoopMonth != 0 ? endYear : endYear + 1;
+
+            let monthIndex = 0;
+            let continueMonths: boolean = true;
+
+            // Get Size of SVG
+            this.calendarSVG.attr({
+                width: this.resizingLayoutHelper.svgWidth,
+                height: this.resizingLayoutHelper.svgHeight
+            });
+
+            while (continueMonths) {
+                monthIndex = monthIndex + 1;
+                // Get data points for the month -- TODO - Make Compatible with IE
+                let monthDataPoints = viewModel.dataPoints.filter(function (obj) {
+                    return obj.month === iterateMonth && obj.year == iterateYear;
+                });
+                let columnNumber = this.getColumnNumber(monthIndex, numberOfMonths, actualNumberOfColumns, actualNumberOfRows, scrollDirection);
+                let rowNumber = this.getRowNumber(monthIndex, numberOfMonths, actualNumberOfColumns, actualNumberOfRows, scrollDirection);
+                this.renderMonth(options, monthDataPoints, iterateMonth, iterateYear, monthIndex, columnNumber, rowNumber, viewModel);
+                iterateMonth = iterateMonth + 1 != 12 ? iterateMonth + 1 : 0;
+                iterateYear = iterateMonth != 0 ? iterateYear : iterateYear + 1;
+                if (iterateMonth == endLoopMonth && iterateYear == endLoopYear) {
+                    continueMonths = false;
+                }
+            }
+
+            this.addSelections(viewModel.dataPoints, viewModel);
+
+            this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.day'),
+                (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => Visual.getTooltipData(tooltipEvent.data),
+                (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => null);
+        }
+
+        // TODO - KC - refactor this in a helper
+        private getColumnNumber(monthIndex: number, numberOfMonths: number, numberOfColumns: number, numberOfRows: number, scrollDirection: number) {
+            // Month Index is base '1'
+            if (scrollDirection == 0 /*Vertical - input columns*/) {
+                let modulusCheck = monthIndex % numberOfColumns;
+                if (modulusCheck == 0) {
+                    return numberOfColumns;
+                }
+                else {
+                    return modulusCheck;
+                }
+            }
+            else { /*Horizontal - input rows*/
+                let fullRows = numberOfMonths % numberOfRows != 0 ? numberOfMonths % numberOfRows : numberOfRows;
+                if (monthIndex > (fullRows * numberOfColumns)) {
+                    numberOfColumns = numberOfColumns - 1;
+                    monthIndex = monthIndex - 1;
+                }
+                let modulusCheck = monthIndex % numberOfColumns;
+                if (modulusCheck == 0) {
+                    return numberOfColumns;
+                }
+                else {
+                    return modulusCheck;
+                }
+            }
+        }
+
+        // TODO - KC - refactor this in a helper
+        private getRowNumber(monthIndex: number, numberOfMonths: number, numberOfColumns: number, numberOfRows: number, scrollDirection: number) {
+            if (scrollDirection == 0) {
+                return Math.ceil(monthIndex / numberOfColumns);
+            }
+            else {
+                let fullRows = numberOfMonths % numberOfRows != 0 ? numberOfMonths % numberOfRows : numberOfRows;
+                if (monthIndex > (fullRows * numberOfColumns)) {
+                    numberOfColumns = numberOfColumns - 1;
+                    monthIndex = monthIndex - 1;
+                }
+                return Math.ceil(monthIndex / numberOfColumns);
+            }
+        }
+
+        private renderMonth(options: VisualUpdateOptions, dataPoints: CalendarDataPoint[], monthNumber: number, yearNumber: number, monthIndex: number, columnNumber: number, rowNumber: number, viewModel: CalendarViewModel) {
+            let self = this;
+            let monthLabel = Month[monthNumber] + ' ' + yearNumber;
+            let stateManager = this.stateManager;
+            let selectionManager = this.selectionManager;
+            let selections = selectionManager.getSelectionIds();
+            let clearVisualSelections = this.clearVisualSelections;
+            let monthHorizontalOffset = columnNumber == 1 ? this.resizingLayoutHelper.horizontalMonthPadding : (this.resizingLayoutHelper.calendarDateRectSize * 7 * (columnNumber - 1)) + (this.resizingLayoutHelper.horizontalMonthPadding * columnNumber); // Considers size of calendar, and padding between months;
+            let monthVerticalOffset = rowNumber == 1 ? this.resizingLayoutHelper.verticalMonthPadding : (this.resizingLayoutHelper.calendarDateRectSize * 7 * (rowNumber - 1)) + (20 * rowNumber) + this.resizingLayoutHelper.verticalMonthPadding;
+
+            // Render Month Label
+            this.calendarContainerGroup.append('text')
+                .style('text-anchor', 'start')
+                .attr('font-size', this.resizingLayoutHelper.calendarDateRectSize)
+                .attr('x', monthHorizontalOffset).attr('y', monthVerticalOffset)
+                .attr('fill', Color[Color.GREY])
+                .text(monthLabel)
+                .on('mouseover', function () { self.addMonthHoverStyling.call(this, (viewModel.configurations.dataPoint.solid.color as string)); })
+                .on('mouseout', this.removeMonthHoverStyling)
+                .on('click', function () {
+                    // GO TO MONTH ZOOM
+                    self.clearVisualSelections();
+                    self.stateManager.setMonthZoom(ZoomLevel.MONTH, monthNumber, yearNumber);
+                    self.stateManager.selectMonth(viewModel, monthNumber, yearNumber);
+                    self.renderMonthZoom(options, viewModel, monthNumber, yearNumber);
+                });
+
+            // Render Day labels            
+            for (let dayLabel of viewModel.dayIndexingArray) {
+                let dayLabelConfig: DayConfiguation = dayLabel;
+                this.calendarContainerGroup.append('text')
+                    .style('text-anchor', 'start')
+                    .attr('font-size', this.resizingLayoutHelper.calendarDateRectSize * this.resizingLayoutHelper.monthTitleRatio)
+                    .attr('x', (dayLabelConfig.configuredDayIndex * this.resizingLayoutHelper.calendarDateRectSize) + monthHorizontalOffset).attr('y', monthVerticalOffset + 15)
+                    .attr('fill', Color[Color.GREY])
+                    .text(dayLabel.dayLabel);
+            }
+
+            let dayRects = this.calendarContainerGroup.selectAll('.day' + monthIndex).data(dataPoints);
+            dayRects.enter().append('rect')
+                .attr("width", this.resizingLayoutHelper.calendarDateRectSize)
+                .attr("height", this.resizingLayoutHelper.calendarDateRectSize)
+                .attr("x", (data: CalendarDataPoint) => {
+                    return this.setXCoordinateOfDay(data.date, columnNumber, monthHorizontalOffset, ZoomLevel.ALL, viewModel.dayIndexingArray);
                 })
-                .enter().append('rect');
+                .attr("y", (data: CalendarDataPoint) => {
+                    return this.setYCoordinateOfDay(data.date, rowNumber, monthVerticalOffset, ZoomLevel.ALL, viewModel.configurations.weekStartDay, viewModel.dayIndexingArray);
+                })
+                .attr('fill', (data: CalendarDataPoint) => {
+                    return data.color;
+                })
+                .attr('stroke', (data: CalendarDataPoint) => {
+                    return DATE_UNSELECTED_COLOR; // TODO
+                })
+                .attr('class', (data: CalendarDataPoint) => {
+                    let isSelected = false;
+                    if (data.selectionId != null) {
+                        for (var i = 0; i < selections.length; i++) {
+                            if (selections[i]["key"] == data.selectionId.getKey()) {
+                                isSelected = true;
+                            }
+                        }
+                    }
 
-            // Add selected group   
-            monthGroup.append('g')
-                .classed('selected', true)
+                    return isSelected ? ' day selected-rect' : 'day';
+                })
+                .attr('stroke-width', `2px`);
 
-            this.renderDateRects(rectGroup, viewModel);
+            dayRects.exit().remove();
+        }
 
-            this.renderBodyElement(viewModel);
+        private setXCoordinateOfDay(date: Date, columnNumber: number, monthOffSet: number, zoomLevel: ZoomLevel, dayIndexingArray: DayConfiguation[]): number {
+            let day = date.getDay();
+            let configuredDay: DayConfiguation = _.find(dayIndexingArray, function (f) { return f.actualDayIndex == day });
+            if (zoomLevel === ZoomLevel.ALL) {
+                return (configuredDay.configuredDayIndex * this.resizingLayoutHelper.calendarDateRectSize) + monthOffSet;
+            }
+            else if (zoomLevel === ZoomLevel.MONTH) {
+                return (configuredDay.configuredDayIndex * this.resizingLayoutHelper.calendarDateRectSize) + monthOffSet + this.resizingLayoutHelper.calendarDateRectSize - 5;
+            }
+        }
+
+        private setYCoordinateOfDay(date: Date, rowNumber: number, monthOffset: number, zoomLevel: ZoomLevel, weekStartDay: number, dayIndexingArray: DayConfiguation[]): number {
+            let firstDayOfWeekInMonth = d3.time.month.floor(date).getDay();
+            let firstDayOfMonth = d3.time.month.floor(date).getDay();
+            let distanceToFirstDay = _.find(dayIndexingArray, function (f) { return f.actualDayIndex == firstDayOfMonth }).configuredDayIndex;;
+            firstDayOfWeekInMonth = firstDayOfWeekInMonth - weekStartDay;
+            const offset = distanceToFirstDay - 1;
+            let weekOfMonth = Math.floor(((date.getDate() + offset) / 7));
+            if (zoomLevel === ZoomLevel.ALL) {
+                return (weekOfMonth * this.resizingLayoutHelper.calendarDateRectSize + TOP_PAD_DATES_ALL_ZOOM) + monthOffset;
+            }
+            else if (zoomLevel === ZoomLevel.MONTH) {
+                return (weekOfMonth * this.resizingLayoutHelper.calendarDateRectSize + TOP_PAD_DATES_ALL_ZOOM) + monthOffset + 15;
+            }
         }
 
         /**********************************************************************
          *                             MONTH ZOOM                             *
          **********************************************************************/
-        private renderMonthZoom(options: VisualUpdateOptions, viewModel: BetterCalendarViewModel) {
-            if (viewModel.yearsList.length === 0)
-                return;
+        private renderMonthZoom(options: VisualUpdateOptions, viewModel: CalendarViewModel, monthNumber: number, yearNumber) {
+            // Clear SVG
+            d3.selectAll('.calendarContainer').remove();
+            let svg = this.calendarSVG;
+            this.calendarContainerGroup = svg.append('g')
+                .classed('calendarContainer', true);
 
-            const selectedMonth: string = Month[this.stateManager.getSelectedMonth()];
-            const selectedYear: number = this.stateManager.getSelectedYear();
-
-            const svgWidth = options.viewport.width - 20;
-
-            let calendarWidth = (svgWidth - LEFT_PAD_MONTH_ZOOM - RIGHT_PAD_MONTH_ZOOM);
-            this.cellSizeMonthZoom = calendarWidth / NUM_DAYS_PER_WEEK;
-
-            const svgHeight = this.cellSizeMonthZoom * MAX_NUM_WEEKS_A_MONTH + TOP_PAD_MONTH_ZOOM + 10;
-
-            const body: d3.Selection<any> = d3.select(this.htmlElement);
-            body.selectAll('svg').remove();
-
-            const svgMonth: d3.Selection<number> = body.append('svg')
-                .classed('svgMonth', true)
-                .attr('width', svgWidth)
-                .attr('height', svgHeight);
+            this.resizingLayoutHelper = getLayoutConfiguration(options.viewport.width, options.viewport.height, viewModel.configurations, viewModel.minimumDate, viewModel.maximumDate, ZoomLevel.MONTH);
+            // Get Size of SVG
+            this.calendarSVG.attr({
+                width: this.resizingLayoutHelper.svgWidth,
+                height: this.resizingLayoutHelper.svgHeight
+            });
+            const selectedMonth: string = Month[monthNumber];
+            const selectedYear: number = yearNumber;
+            let self = this;
 
             // Create Marker definition and path for back button
-            let monthFontSize = this.cellSizeMonthZoom / 2;
+            let monthFontSize = this.resizingLayoutHelper.calendarDateRectSize / 2;
             let xAxisStart = 70;
             let xAxistEnd = 70;
             let yAxisStart = 60
             let yAxisEnd = yAxisStart - monthFontSize;
             var data = [{ id: 0, name: 'arrow', path: 'M 0,0 m -5,-5 L 5,0 L -5,5 Z', linePath: 'M ' + xAxisStart.toString() + ',' + yAxisStart.toString() + ' L ' + xAxistEnd.toString() + ',' + yAxisEnd.toString(), viewbox: '-5 -5 10 10' }];
-            svgMonth.append('rect')
+            this.calendarContainerGroup.append('rect').classed('allZoomButton', true)
                 .attr('x', 60).attr('y', yAxisEnd - 8).attr("width", 20).attr("height", yAxisStart - yAxisEnd + 8)
                 .attr('fill', "white")
                 .on('click', () => {
-                    // go back to ALL zoom
-                    this.stateManager.clearSelections();
-                    this.stateManager.setAllZoom();
-                    this.renderAllZoom(options, viewModel);
+                    // Zoom out to all
+                    self.clearVisualSelections();
+                    self.stateManager.setAllZoom();
+                    self.renderAllZoom(options, viewModel); // TODO - KC
                 });
-            var defs = svgMonth.append("svg:defs");
-            var paths = svgMonth.append('svg:g').attr('id', 'markers');
+            var defs = this.calendarContainerGroup.append("svg:defs");
+            var paths = this.calendarContainerGroup.append('svg:g').attr('id', 'markers');
             var marker = defs.selectAll('marker')
                 .data(data).enter()
                 .append('svg:marker').attr('id', function (d) { return 'marker_' + d.name })
@@ -332,411 +702,175 @@ module powerbi.extensibility.visual {
                 .attr('stroke-linecap', 'round')
                 .attr('marker-end', function (d, i) { return 'url(#marker_' + d.name + ')' })
                 .on('click', () => {
-                    // go back to ALL zoom
-                    this.stateManager.clearSelections();
-                    this.stateManager.setAllZoom();
-                    this.renderAllZoom(options, viewModel);
+                    // Zoom out to all
+                    self.clearVisualSelections();
+                    self.stateManager.setAllZoom();
+                    self.renderAllZoom(options, viewModel);
                 });
 
-            // month and year label
-            svgMonth.append('text')
+            // Month and Year Label
+            this.calendarContainerGroup.append('text')
                 .style('text-anchor', 'start')
-                .attr('font-size', this.cellSizeMonthZoom * .5)
+                .attr('font-size', this.resizingLayoutHelper.calendarDateRectSize * this.resizingLayoutHelper.monthTitleRatio)
                 .attr('x', LEFT_PAD_MONTH_ZOOM + 70).attr('y', TOP_PAD_MONTH_ZOOM - 40)
                 .attr('fill', Color[Color.GREY])
                 .text(`${selectedMonth} ${selectedYear}`);
-            // day labels
-            const dayXCoordTable = this.getDayLabelXCoordTable(ZoomLevel.MONTH, WEEK_FORMAT);
-            for (let dayXCoord of dayXCoordTable) {
-                svgMonth.append('text')
+            // Render Day labels            
+            for (let dayLabel of viewModel.dayIndexingArray) {
+                let dayLabelConfig: DayConfiguation = dayLabel;
+                this.calendarContainerGroup.append('text')
                     .style('text-anchor', 'start')
-                    .attr('font-size', this.cellSizeMonthZoom * .3)
-                    .attr('x', dayXCoord[1]).attr('y', TOP_PAD_MONTH_ZOOM - 10)
+                    .attr('font-size', this.resizingLayoutHelper.calendarDateRectSize * this.resizingLayoutHelper.monthTitleRatio)
+                    .attr('x', (dayLabelConfig.configuredDayIndex * this.resizingLayoutHelper.calendarDateRectSize) + 50).attr('y', 100)
                     .attr('fill', Color[Color.GREY])
-                    .text(dayXCoord[0]);
+                    .text(dayLabel.dayLabel);
             }
 
-            //
-            // rects for days
-            //
-            const dates = this.stateManager.getDaysInMonthBySelectedMonth(this.stateManager.getSelectedMonth(), selectedYear, viewModel);
-            const datesOfMonthSelected: Date[] = dates.selectedDays;
-            const datesOfMonth: Date[] = dates.unselectedDays;
-            const month: number = this.stateManager.getSelectedMonth();
+            let monthDataPoints: CalendarDataPoint[] = _.filter(viewModel.dataPoints, function (dataPoint) { return dataPoint.month == monthNumber && dataPoint.year == yearNumber; });
+            let dayRects = this.calendarContainerGroup.selectAll('.day').data(monthDataPoints);
+            dayRects.enter().append('rect').classed('day', true)
+                .attr("width", this.resizingLayoutHelper.calendarDateRectSize)
+                .attr("height", this.resizingLayoutHelper.calendarDateRectSize)
+                .attr("x", (data: CalendarDataPoint) => {
+                    return this.setXCoordinateOfDay(data.date, 1, 50, ZoomLevel.ALL, viewModel.dayIndexingArray);
+                })
+                .attr("y", (data: CalendarDataPoint) => {
+                    return this.setYCoordinateOfDay(data.date, 1, 100, ZoomLevel.ALL, viewModel.configurations.weekStartDay, viewModel.dayIndexingArray);
+                })
+                .attr('fill', (data: CalendarDataPoint) => {
+                    return data.color;
+                })
+                .attr('stroke', (data: CalendarDataPoint) => {
+                    return DATE_UNSELECTED_COLOR; // TODO
+                })
+                .attr('stroke-width', `2px`);
 
-            const unselectedGroup = svgMonth.append('g')
-                .classed('unselected', true);
+            dayRects.exit().remove();
 
-            const selectedGroup = svgMonth.append('g')
-                .classed('selected', true);
-
-            const unselectedRectGroup: d3.Selection<Date> = unselectedGroup.selectAll('rect')
-                .data(datesOfMonth)
-                .enter().append('rect');
-
-            this.renderDateRects(unselectedRectGroup, viewModel);
-
-            const selectedRectGroup: d3.Selection<Date> = selectedGroup.selectAll('rect')
-                .data(datesOfMonthSelected)
-                .enter().append('rect');
-
-            this.renderDateRects(selectedRectGroup, viewModel);
-
-            // show dates for sundays
+            // Show dates for start of week
             // date box
-            const allDatesOfMonth: Date[] = datesOfMonth.concat(datesOfMonthSelected);
+            const datesOfMonth: Date[] = [];
+            for (let dp of monthDataPoints) {
+                datesOfMonth.push(dp.date);
+            }
 
-            const strokeWidth = STROKE_WIDTH_MONTH_ZOOM;
-            const strokeModifier = calendarWidth * .008;
-            const dateBoxSize = ((strokeWidth - 1) * strokeModifier) * 2;
-            const zoomLevel: ZoomLevel = this.stateManager.getZoomLevel();
-
-            svgMonth.selectAll('g g')
-                .data(allDatesOfMonth.filter((date: Date) => {
-                    return date.getDay() === 0;
+            this.calendarContainerGroup.selectAll('.dayNumberBox')
+                .data(datesOfMonth.filter((date: Date) => {
+                    return date.getDay() === viewModel.configurations.weekStartDay;
                 }))
-                .enter().append('rect')
-                .attr('width', dateBoxSize)
-                .attr('height', dateBoxSize)
+                .enter().append('rect').classed("dayNumberBox", true)
+                .attr('width', 18)
+                .attr('height', 18)
                 .attr('x', (date: Date) => {
-                    const rectX = this.setXCoordinateOfDay(date, zoomLevel);
-                    return rectX + this.cellSizeMonthZoom - (dateBoxSize);
+                    const rectX = this.setXCoordinateOfDay(date, 1, 50, ZoomLevel.MONTH, viewModel.dayIndexingArray);
+                    return rectX - 13;
                 })
                 .attr('y', (date: Date) => {
-                    return this.setYCoordinateOfDay(date, zoomLevel);
+                    const rectY = this.setYCoordinateOfDay(date, 1, 100, ZoomLevel.MONTH, viewModel.configurations.weekStartDay, viewModel.dayIndexingArray);;
+                    return rectY - 15;
                 })
                 .attr('fill', (date: Date) => {
-                    const dateValue: DateValue = viewModel.dateValueTable[date.toString()];
-                    return (dateValue) ? dateValue.color : Color[Color.WHITE];
+                    return Color[Color.WHITE];
                 })
                 .attr('stroke', (date: Date) => {
                     return DATE_UNSELECTED_COLOR;
                 })
-                .attr('stroke-width', `${strokeWidth}px`)
-            // date number
-            svgMonth.selectAll('g g')
-                .data(allDatesOfMonth.filter((date: Date) => {
-                    return date.getDay() === 0;
-                }))
-                .enter().append('text')
+                .attr('stroke-width', `2px`)
+            // Date Number
+            let dayNumberText = this.calendarContainerGroup.selectAll('.dayNumber')
+                .data(datesOfMonth.filter((date: Date) => {
+                    return date.getDay() === viewModel.configurations.weekStartDay;
+                }));
+            dayNumberText.enter().append('text').classed('dayNumber', true)
                 .style('text-anchor', 'end')
-                .attr('font-size', this.cellSizeMonthZoom * .2)
+                .attr('font-size', 12)
                 .attr('fill', Color[Color.GREY])
                 .attr('x', (date: Date) => {
-                    const rectX = this.setXCoordinateOfDay(date, zoomLevel);
-                    return rectX + this.cellSizeMonthZoom - ((strokeWidth - 2.85) * strokeModifier);
+                    const rectX = this.setXCoordinateOfDay(date, 1, 50, ZoomLevel.MONTH, viewModel.dayIndexingArray);
+                    return rectX + 3;
                 })
                 .attr('y', (date: Date) => {
-                    const rectY = this.setYCoordinateOfDay(date, zoomLevel);
-                    return rectY + ((strokeWidth) * strokeModifier);
+                    const rectY = this.setYCoordinateOfDay(date, 1, 100, ZoomLevel.MONTH, viewModel.configurations.weekStartDay, viewModel.dayIndexingArray);;
+                    return rectY;
                 })
                 .text((date: Date) => {
                     return date.getDate();
                 });
 
-            this.renderBodyElement(viewModel);
+            this.addSelections(monthDataPoints, viewModel);
+            this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.day'),
+                (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => Visual.getTooltipData(tooltipEvent.data),
+                (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => null);
         }
 
-        private renderDateRects(rectGroup: d3.Selection<Date>, viewModel: BetterCalendarViewModel) {
-            const zoomLevel = this.stateManager.getZoomLevel();
-            let strokeWidth: ZoomLevel;
-            let cellSize: number;
-            if (zoomLevel === ZoomLevel.ALL) {
-                strokeWidth = STROKE_WIDTH_ALL_ZOOM;
-                cellSize = this.cellSizeAllZoom;
-            } else if (zoomLevel === ZoomLevel.MONTH) {
-                strokeWidth = STROKE_WIDTH_MONTH_ZOOM;
-                cellSize = this.cellSizeMonthZoom;
-            } else {
-                strokeWidth = 1;
-                cellSize = this.cellSizeAllZoom;
-            }
+        private yearView(viewModel: CalendarViewModel) {
+            // Clear SVG
+            d3.selectAll('.calendarContainer').remove();
+            let svg = this.calendarSVG;
+            this.calendarContainerGroup = svg.append('g')
+                .classed('calendarContainer', true);
+            let yearViewLayoutHelper = this.yearViewLayoutHelper;
 
-            rectGroup.classed('day', true)
-                .attr("width", cellSize)
-                .attr("height", cellSize)
+            // Get Size of SVG
+            this.calendarSVG.attr({
+                width: yearViewLayoutHelper.svgWidth,
+                height: yearViewLayoutHelper.svgHeight
+            });
+            this.renderYearView(viewModel, yearViewLayoutHelper);
+        }
 
-                // positioning
-                .attr("x", (date: Date) => {
-                    return this.setXCoordinateOfDay(date, zoomLevel);
+        private renderYearView(viewModel: CalendarViewModel, yearViewLayout: YearViewLayoutConfiguration) {
+            let self = this;
+            let dataPoints = viewModel.yearDataPoints;
+            let numberOfYears = dataPoints.length;
+            let numberOfRows = yearViewLayout.numberOfRows;
+            let numberOfColumns = yearViewLayout.numberOfColumns;
+            let rectWidth = yearViewLayout.yearRectSize;
+            let padding = yearViewLayout.svgPadding;
+            let yearRects = this.calendarContainerGroup.selectAll('.year').data(dataPoints);
+            yearRects.enter().append('rect').classed('year', true)
+                .attr("width", rectWidth)
+                .attr("height", rectWidth)
+                .attr("x", (data: YearDataPoint) => {
+                    let columnNumber = this.getColumnNumber(data.yearIndex, numberOfYears, numberOfColumns, numberOfRows, 0);
+                    let offset = columnNumber - 1;
+                    return (yearViewLayout.yearRectSize * (columnNumber - 1)) + padding;
                 })
-                .attr("y", (date: Date) => {
-                    return this.setYCoordinateOfDay(date, zoomLevel);
+                .attr("y", (data: YearDataPoint) => {
+                    let rowNumber = this.getRowNumber(data.yearIndex, numberOfYears, numberOfColumns, numberOfRows, 0);
+                    return (yearViewLayout.yearRectSize * (rowNumber - 1)) + padding;
                 })
+                .attr('fill', (data: YearDataPoint) => {
+                    return data.color;
+                })
+                .attr('stroke', (data: YearDataPoint) => {
+                    return DATE_UNSELECTED_COLOR; // TODO
+                })
+                .attr('stroke-width', `2px`);
 
-                // rect attributes
-                .attr('fill', (date: Date) => {
-                    const dateValue: DateValue = viewModel.dateValueTable[date.toString()];
-                    return (dateValue) ? dateValue.color : Color[Color.WHITE];
-                })
-                .attr('stroke', (date: Date) => {
-                    const isSelected = this.stateManager.isDateSelected(date, viewModel);
-                    return (isSelected) ? DATE_SELECTED_COLOR : DATE_UNSELECTED_COLOR;
-                })
-                .attr('stroke-width', `${strokeWidth}px`)
+            yearRects.exit().remove();
 
-                // storing rect selection to corresponding dateValue
-                .each((date: Date, j: number, i: number) => {
-                    const dateValue: DateValue = viewModel.dateValueTable[date.toString()];
-                    if (dateValue) {
-                        assert(rectGroup !== undefined, 'error: rectgroup is undefined');
-                        assert(rectGroup[i] !== undefined, `error: rectgroup[${i}] is undefined`);
-                        assert(rectGroup[i][j] !== undefined, `error: rectgroup[${i}][${j}] is undefined`);
-                        const rect: d3.Selection<Date> = d3.select(rectGroup[i][j]);
-                        assert(rect !== undefined, 'error: selecting it is undefined');
-                    }
+            let yearLabels = this.calendarContainerGroup.selectAll('.yearLabel').data(dataPoints);
+            yearRects.enter().append('text').classed('yearLabel', true)
+                .attr("x", (data: YearDataPoint) => {
+                    let columnNumber = this.getColumnNumber(data.yearIndex, numberOfYears, numberOfColumns, numberOfRows, 0);
+                    let offset = columnNumber - 1;
+                    return (yearViewLayout.yearRectSize * (columnNumber - 1)) + padding + (rectWidth / 2) - (.2 * rectWidth);
                 })
-
-                // rect behavior
-                .on('mouseover.tooltip', (date: Date) => {
-                    this.renderTooltip(date, viewModel, false);
+                .attr("y", (data: YearDataPoint) => {
+                    let rowNumber = this.getRowNumber(data.yearIndex, numberOfYears, numberOfColumns, numberOfRows, 0);
+                    return (yearViewLayout.yearRectSize * (rowNumber - 1)) + padding + (rectWidth / 2);
                 })
-                .on('mousemove.tooltip', (date: Date) => {
-                    this.renderTooltip(date, viewModel, true);
+                .attr("font-size", (data: YearDataPoint) => {
+                    return rectWidth * yearViewLayout.yearTitleRatio;
                 })
-                .on('mouseout.tooltip', (date: Date) => {
-                    this.host.tooltipService.hide({
-                        isTouchEvent: false,
-                        immediately: false
-                    } as TooltipHideOptions);
+                .text((data: YearDataPoint) => {
+                    return data.year;
                 });
 
-            // handle single/multi selections
-            rectGroup.on('mousedown', (date: Date) => {
-                const mouseEvent = d3.event as MouseEvent;
-                const dateValue: DateValue = viewModel.dateValueTable[date.toString()];
-                if (!mouseEvent.shiftKey && !mouseEvent.ctrlKey) {
-                    if (this.stateManager.activeSelectionCount() == 1 && this.stateManager.isDateSelected(date, viewModel)) {
-                        this.stateManager.unSelect(date, viewModel);
-                    } else {
-                        this.stateManager.clearSelections();
-                        this.stateManager.select(dateValue, KeyMod.NONE, viewModel);
-                    }
+            yearRects.exit().remove();
 
-                    // clicking outside of month in month zoom should change back to month selection
-                    const dateInData = this.stateManager.isDateInData(dateValue);
-                    if (!dateInData && this.stateManager.getZoomLevel() === ZoomLevel.MONTH)
-                        this.stateManager.selectMonth(viewModel);
-                } else if (mouseEvent.shiftKey) {
-                    this.stateManager.clearSelections();
-                    this.stateManager.select(dateValue, KeyMod.SHIFT, viewModel);
-                } else if (mouseEvent.ctrlKey) {
-                    if (this.stateManager.isDateSelected(date, viewModel))
-                        this.stateManager.unSelect(date, viewModel);
-                    else
-                        this.stateManager.select(dateValue, KeyMod.CTRL, viewModel);
-                }
-                this.reorderDaysBySelection(viewModel);
-            });
-        }
-
-        private reorderDaysBySelection(viewModel: BetterCalendarViewModel) {
-            var svgMonthSelection: d3.Selection<any>;
-            switch (this.stateManager.getZoomLevel()) {
-                case ZoomLevel.ALL:
-                    svgMonthSelection = d3.select(this.htmlElement).selectAll('svg g.year g.month');
-                    for (var i = 0; i < viewModel.yearsList.length; i++) {
-                        for (var j = 0; j < 12; j++) {
-                            var month = svgMonthSelection.filter(function (n) {
-                                return j === n.month && viewModel.yearsList[i] === n.year;
-                            })
-                            if (month.length > 0) {
-                                const dates = this.stateManager.getDaysInMonthBySelectedMonth(j, viewModel.yearsList[i], viewModel);
-                                this.reorderDaysByMonth(month, dates, viewModel);
-                            }
-                        }
-                    }
-                    break;
-                case ZoomLevel.MONTH:
-                    const dates = this.stateManager.getDaysInMonthBySelectedMonth(this.stateManager.getSelectedMonth(), this.stateManager.getSelectedYear(), viewModel);
-                    svgMonthSelection = d3.select('svg.svgMonth');
-                    this.reorderDaysByMonth(svgMonthSelection, dates, viewModel);
-                    break;
-            }
-        }
-
-        private reorderDaysByMonth(svgMonth: d3.Selection<any>, dates: { unselectedDays: Date[], selectedDays: Date[] }, viewModel: BetterCalendarViewModel) {
-           
-            const addToSelected: d3.Selection<Date> = removeChangedDays(svgMonth.selectAll('g.unselected rect'), dates.unselectedDays);
-            const addToUnselected: d3.Selection<Date> = removeChangedDays(svgMonth.selectAll('g.selected rect'), dates.selectedDays);
-            
-            addChangedDays(addToSelected, svgMonth.selectAll('g.selected'));
-            addChangedDays(addToUnselected, svgMonth.selectAll('g.unselected'));
-
-            renderDayStroke(svgMonth.selectAll('g.unselected rect'), DATE_UNSELECTED_COLOR);
-            renderDayStroke(svgMonth.selectAll('g.selected rect'), DATE_SELECTED_COLOR);
-
-            function removeChangedDays(monthSelection: d3.Selection<Date>, baseDateArr: Date[]): d3.Selection<Date> {
-                return monthSelection.filter(function (datum: any, index: number, outerIndex: number) {
-                    return baseDateArr.map(function (n) { return n.valueOf(); }).indexOf(datum.valueOf()) == -1;
-                }).remove();
-            }
-
-            function addChangedDays(changedSelection: d3.Selection<Date>, destinationSelection: d3.Selection<Date>) {
-                changedSelection[0].forEach(function (n) {
-                    var date = getDataFromElement(n);
-                    destinationSelection
-                        .append(function () { return n; })
-                        .data([date])
-                        .enter()
-                });
-            }
-
-            function renderDayStroke(selection: d3.Selection<Date>, stroke: string) {
-                selection.attr('stroke', stroke);
-            }
-
-            function getDataFromElement(elem): Date {
-                return elem.__data__;
-            }
-        }
-        
-        private renderBodyElement(viewModel: BetterCalendarViewModel) {
-            // setting up body element
-            const body: d3.Selection<any> = d3.select(this.htmlElement);
-            const rectGroup: d3.Selection<Date> = body.selectAll('rect');
-            body.style('overflow', 'auto');
-            body.on('mousedown', () => {
-                const mouseEvent = d3.event as MouseEvent;
-                // body ALSO hit if date already selected and clicked again with modifier
-                if (!mouseEvent.ctrlKey && !mouseEvent.shiftKey) {
-                    const reRender: boolean = this.stateManager.hasActiveSelection();
-                    this.stateManager.clearSelections();
-                    this.stateManager.setAnchor(null);
-                    if (this.stateManager.getZoomLevel() === ZoomLevel.MONTH)
-                        this.stateManager.selectMonth(viewModel);
-                    if (reRender) {
-                        this.reorderDaysBySelection(viewModel);
-                    }
-                }
-            });
-            // render individual day selection on update
-            this.reorderDaysBySelection(viewModel);
-        }
-
-        private setXCoordinateOfDay(date: Date, zoomLevel: ZoomLevel): number {
-            let day = date.getDay();
-            if (WEEK_FORMAT === WeekFormat.MON_SUN) {
-                // Date object gives Sunday as 0, but we need it as 6
-                day = (day === 0) ? Day.SUN : day - 1;
-            }
-
-            if (zoomLevel === ZoomLevel.ALL)
-                return day * this.cellSizeAllZoom;
-            else if (zoomLevel === ZoomLevel.MONTH)
-                return day * this.cellSizeMonthZoom + LEFT_PAD_MONTH_ZOOM;
-        }
-
-        private setYCoordinateOfDay(date: Date, zoomLevel: ZoomLevel): number {
-            let firstDayOfWeekInMonth = d3.time.month.floor(date).getDay();
-            if (WEEK_FORMAT === WeekFormat.MON_SUN) {
-                // We need Sunday as 6 instead of 0
-                firstDayOfWeekInMonth = (firstDayOfWeekInMonth === 0)
-                    ? Day.SUN : firstDayOfWeekInMonth - 1;
-            }
-
-            const offset = firstDayOfWeekInMonth - 1;
-            const weekOfMonth = Math.floor((date.getDate() + offset) / NUM_DAYS_PER_WEEK);
-            if (zoomLevel === ZoomLevel.ALL)
-                return weekOfMonth * this.cellSizeAllZoom + TOP_PAD_DATES_ALL_ZOOM;
-            else if (zoomLevel === ZoomLevel.MONTH)
-                return weekOfMonth * this.cellSizeMonthZoom + TOP_PAD_MONTH_ZOOM;
-        }
-
-        private getDayLabelXCoordTable(zoomLevel: ZoomLevel, weekFormat: WeekFormat): (string | number)[][] {
-            let cellSize, offset;
-            if (zoomLevel === ZoomLevel.ALL) {
-                cellSize = this.cellSizeAllZoom;
-                offset = 10;
-            } else if (zoomLevel === ZoomLevel.MONTH) {
-                cellSize = this.cellSizeMonthZoom;
-                offset = LEFT_PAD_MONTH_ZOOM + 20;
-            }
-
-            const dayXCoordTable: (string | number)[][] = [
-                ['Su', 0 * cellSize + offset],
-                ['Mo', 1 * cellSize + offset],
-                ['Tu', 2 * cellSize + offset],
-                ['We', 3 * cellSize + offset],
-                ['Th', 4 * cellSize + offset],
-                ['Fr', 5 * cellSize + offset],
-                ['Sa', 6 * cellSize + offset]
-            ];
-
-            if (weekFormat === WeekFormat.MON_SUN) {
-                // Move Sunday to the end of the list and redo offsets
-                dayXCoordTable.push(dayXCoordTable.shift());
-                for (let i = 0; i < NUM_DAYS_PER_WEEK; i++)
-                    dayXCoordTable[i][1] = i * cellSize + offset;
-            }
-
-            return dayXCoordTable;
-        }
-
-        private renderTooltip(date: Date, viewModel: BetterCalendarViewModel, isMoving: boolean) {
-            // can display tooltip if mouse button is not pressed
-            const mouseEvent: MouseEvent = d3.event as MouseEvent;
-            let canDisplayTooltip: boolean = true;
-            if (mouseEvent.buttons !== undefined)
-                canDisplayTooltip = (mouseEvent.buttons === 0);
-
-            // also don't ignore mouse events immediately after touch end
-            canDisplayTooltip = canDisplayTooltip && (this.touchTimeoutId == null || this.touchTimeoutId == undefined);
-            if (!canDisplayTooltip)
-                return;
-
-            const isPointerEvent = window['PointerEvent'] as boolean;
-
-            // dates without corresponding data will not be in dateValueTable
-            let dateValue: DateValue = viewModel.dateValueTable[date.toString()];
-            let dataItems: VisualTooltipDataItem[];
-            if (dateValue !== undefined) {
-                dataItems = dateValue.tooltipDataItems;
-            } else {
-                dataItems = [{
-                    displayName: d3.time.format('%Y-%m-%d')(new Date(date)),
-                    value: '0',
-                    color: null,
-                    header: null
-                }];
-            }
-
-            const tooltipOptions = {
-                coordinates: this.getMouseCoordinates(this.htmlElement, isPointerEvent),
-                isTouchEvent: false,
-                dataItems: dataItems,
-                identities: []  // TODO something to do with selectionId? now hardcoded empty
-            };
-
-            if (isMoving)
-                this.host.tooltipService.move(tooltipOptions as TooltipMoveOptions);
-            else
-                this.host.tooltipService.show(tooltipOptions as TooltipShowOptions);
-        }
-
-        private getMouseCoordinates(element: Element, isPointerEvent: boolean): number[] {
-            let coordinates: number[];
-
-            if (isPointerEvent) {
-                // copied from d3_eventSource (which is not exposed)
-                let e = d3.event as any;
-                let s;
-                while (s = e.sourceEvent) {
-                    e = s;
-                }
-                const rect = element.getBoundingClientRect();
-                coordinates = [
-                    e.clientX - rect.left - element.clientLeft,
-                    e.clientY - rect.top - element.clientTop
-                ];
-            } else {
-                const touchCoordinates = d3.touches(element);
-                if (touchCoordinates && touchCoordinates.length > 0) {
-                    coordinates = touchCoordinates[0];
-                }
-            }
-
-            return coordinates;
+            this.addYearSelections(viewModel.dataPoints);
         }
 
         // Event Callbacks for Link/View Navigation Styling
@@ -749,7 +883,174 @@ module powerbi.extensibility.visual {
         private removeMonthHoverStyling(textElem?: Element) {
             textElem = textElem && textElem instanceof Element ? textElem : (this as any);
             textElem.removeAttribute('stroke');
-            textElem.removeAttribute('fill');
+            textElem.setAttribute("fill", Color[Color.GREY]);
         }
+
+        private static getTooltipData(value: CalendarDataPoint): VisualTooltipDataItem[] {
+            return [{
+                displayName: d3.time.format('%Y-%m-%d')(value.date),
+                value: value.value.toString()
+            }];
+        }
+
+        private addSelections(dataPoints: CalendarDataPoint[], viewModel: CalendarViewModel) {
+            // Add Selections
+            let self = this;
+            let selectionManager = this.selectionManager;
+            let stateManager = this.stateManager;
+            let selectedIds: ISelectionId[] = [];
+            let singleSelect = false;
+            let dayRects = this.calendarContainerGroup.selectAll('.day');
+            dayRects.on('click', function (d) {
+                let minShift = d.date;
+                let maxShift = d.date;
+                let currentClickDate = d.date;
+                let lastClickedDate = stateManager.getLastClickedDate();
+                if (d.selectionId != null) {
+                    let mouseEvent = d3.event as MouseEvent;
+                    // For 'Ctrl' press - Add new existing selections, but remove if prexisted
+                    if (mouseEvent.ctrlKey && !mouseEvent.shiftKey) {
+                        singleSelect = false;
+                        let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
+                        if (isSelected) {
+                            selectedIds = _.filter(selectedIds, function (sid) { return sid != d.selectionId; });
+                        }
+                        else {
+                            selectedIds.push(d.selectionId);
+                        }
+                        stateManager.setAnchor(d.date);
+                    }
+                    else if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
+                        // For 'Shift, get range of dates
+                        // Remove Selected Date Rect Class and set to unselected
+                        d3.selectAll('.day').classed('selected-rect', false).attr({
+                            'stroke': DATE_UNSELECTED_COLOR
+                        });
+                        let anchor = stateManager.getAnchor();
+                        if (anchor == null) {
+                            stateManager.setAnchor(d.date);
+                            anchor = currentClickDate;
+                        }
+                        minShift = currentClickDate < anchor ? currentClickDate : anchor;
+                        maxShift = currentClickDate > anchor ? currentClickDate : anchor;
+                        selectedIds = [];
+                        // Get all selection Ids between the min and max dates
+                        let selectedDataPoints: CalendarDataPoint[] = _.filter(dataPoints, function (dataPoint) { return dataPoint.date >= minShift && dataPoint.date <= maxShift; });
+                        _.each(selectedDataPoints, function (dp) {
+                            if (dp.selectionId != null) {
+                                selectedIds.push(dp.selectionId);
+                            }
+                        });
+                    }
+                    // Single Select
+                    else {
+                        singleSelect = true;
+                        if (selectedIds.length) {
+                            selectedIds = [];
+                        }
+                        selectedIds.push(d.selectionId);
+                        stateManager.setAnchor(d.date);
+                    }
+
+                    // Allow selection only if visual is rendered in a view that supports interactivty (e.g. Reports)
+                    selectionManager.select(selectedIds).then((ids: ISelectionId[]) => {
+                        if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
+                            d3.selectAll('.day').filter(function (d) {
+                                let cdp: CalendarDataPoint = d;
+                                return cdp.date >= minShift && cdp.date <= maxShift ? true : false;
+                            }).classed('selected-rect', true).attr({
+                                'stroke': DATE_SELECTED_COLOR
+                            }).each(function () {
+                                // Move selection to front
+                                this.parentNode.appendChild(this);
+                            });
+                        }
+                        else {
+                            if (singleSelect) {
+                                // If single click remove all selected style
+                                d3.selectAll('.day').classed('selected-rect', false);
+                            }
+                            let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
+                            if (!isSelected) {
+                                d3.select(this).classed('selected-rect', true);
+                            }
+                            else {
+                                d3.select(this).classed('selected-rect', false);
+                            }
+
+                            // Unselect all days
+                            d3.selectAll('.day').attr({ 'stroke': DATE_UNSELECTED_COLOR })
+                            // Select all rects with selected-rect class
+                            d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
+                                .each(function () {
+                                    // Move selection to front
+                                    this.parentNode.appendChild(this);
+                                });
+                        }
+
+                        // TODO - Bug when you single select a selected square after special select
+
+                    });
+                }
+
+                // Month Zoom Specific
+                if (ZoomLevel.MONTH == stateManager.getZoomLevel()) {
+                    // Insure Day Numbers are rendered first
+                    self.calendarContainerGroup.selectAll('.dayNumberBox').each(function () {
+                        // Move selection to front
+                        this.parentNode.appendChild(this);
+                    })
+                    self.calendarContainerGroup.selectAll('.dayNumber').each(function () {
+                        // Move selection to front
+                        this.parentNode.appendChild(this);
+                    })
+
+                    let selectedRectsInMonth = d3.selectAll('.selected-rect');
+                    if(selectedRectsInMonth[0].length == 0){
+                        stateManager.selectMonth(viewModel, stateManager.getSelectedMonth(), stateManager.getSelectedYear());
+                    }
+                }
+            });
+        }
+
+        private addYearSelections(dataPoints: CalendarDataPoint[]) {
+            // Add Selections
+            let self = this;
+            let stateManager = this.stateManager;
+            let yearRects = this.calendarContainerGroup.selectAll('.year');
+            yearRects.on('click', function (d) {
+                // Remove Selected Date Rect Class and set to unselected
+                d3.selectAll('.year').classed('selected-rect', false).attr({
+                    'stroke': DATE_UNSELECTED_COLOR
+                });
+                let selectedYear = d.year;
+                stateManager.selectYear(dataPoints, selectedYear);
+                d3.select(this).classed('selected-rect', true).attr({
+                    'stroke': DATE_SELECTED_COLOR
+                }).each(function () {
+                    // Move selection to front
+                    this.parentNode.appendChild(this);
+                });
+                self.calendarContainerGroup.selectAll('.yearLabel').each(function () {
+                    // Move selection to front
+                    this.parentNode.appendChild(this);
+                })
+            });
+        }
+
+        private clearVisualSelections() {
+            d3.selectAll('rect').classed('selected-rect', false).attr({
+                'stroke': DATE_UNSELECTED_COLOR
+            });
+            this.selectionManager.clear();
+        }
+
+        // private constructTallanPreview(options: VisualConstructorOptions) {
+        //     var tallanPreview = d3.select(options.element).append('svg').classed('tallan-preview', true).attr("xlink:href", "http://www.tallan.com");
+        //     tallanPreview.append('text').text('Tallan')
+        //         .attr('x', 100).attr('y', 100)
+        //         .attr('fill', Color[Color.GREY])
+        //         .attr("xlink:href", "http://www.tallan.com");
+        // }
     }
 }

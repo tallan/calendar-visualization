@@ -2,17 +2,17 @@
   "visual": {
     "name": "CalendarVisual",
     "displayName": "Calendar by Tallan",
-    "guid": "CalendarVisualA45056645E4E428B9D26EF971839A6B2",
+    "guid": "CalendarVisualA45056645E4E428B9D26EF971839A6B5",
     "visualClassName": "Visual",
-    "version": "1.0.0",
-    "description": "Visualize data over time on a standard calendar with year and month views.",
-    "supportUrl": "https://github.com/tallan/calendar-visualization/issues",
+    "version": "2.0.0",
+    "description": "A standard calendar layout that filters and aggregates data across a range of dates.",
+    "supportUrl": "https://www.tallan.com/custom-technology/power-bi-support-services/",
     "gitHubUrl": "https://github.com/tallan/calendar-visualization"
   },
   "apiVersion": "1.6.0",
   "author": {
     "name": "Tallan, Inc.",
-    "email": "help@tallan.com"
+    "email": "powerbi.support@tallan.com"
   },
   "assets": {
     "icon": "assets/icon.png"
