@@ -4,7 +4,7 @@
     "displayName": "Calendar by Tallan",
     "guid": "CalendarVisualA45056645E4E428B9D26EF971839A6B5",
     "visualClassName": "Visual",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "A standard calendar layout that filters and aggregates data across a range of dates.",
     "supportUrl": "https://www.tallan.com/custom-technology/power-bi-support-services/",
     "gitHubUrl": "https://github.com/tallan/calendar-visualization"

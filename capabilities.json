@@ -13,6 +13,9 @@
             "description": "Numeric data values"
         }
     ],
+    "drilldown": {
+        "roles": ["Category"]
+    },
     "dataViewMappings": [
         {
             "conditions": [
