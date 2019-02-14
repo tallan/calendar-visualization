@@ -37,7 +37,6 @@ module powerbi.extensibility.visual {
             this.viewModel = viewModel;
             this.options = options;
             let currentZoomLevel = this.stateManager.getZoomLevel();
-            debugger;
             this.layoutConfig = new LayoutConfiguration(options, viewModel, currentZoomLevel);
             if (this.viewModel.isLandingPage) {
                 if (!this.isLandingPageOn || options.dataViews[0].metadata.columns.length >= 3) {
