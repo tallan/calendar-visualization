@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "ES5",
+    "sourceMap": true,
+    "out": "./.tmp/build/visual.js"
+  },
+  "files": [
+    ".api/v2.3.0/PowerBI-visuals.d.ts",
+    "node_modules/powerbi-models/dist/models-noexports.d.ts",
+    "node_modules/powerbi-visuals-utils-dataviewutils/lib/index.d.ts",
+    "node_modules/powerbi-visuals-utils-interactivityutils/lib/index.d.ts",
+    "node_modules/powerbi-visuals-utils-svgutils/lib/index.d.ts",
+    "node_modules/powerbi-visuals-utils-typeutils/lib/index.d.ts",
+    "node_modules/underscore/underscore.js",
+    "src/config/defaultSettings.ts",
+    "src/helpers/helpers.ts",
+    "src/helpers/objectEnumerationUtility.ts",
+    "src/managers/stateManager.ts",
+    "src/managers/viewManager.ts",
+    "src/models/enums.ts",
+    "src/models/interfaces.ts",
+    "src/models/layoutConfiguration.ts",
+    "src/models/yearviewLayoutConfiguration.ts",
+    "src/tooltipServiceWrapper.ts",
+    "src/visual.ts"    
+  ]
+}

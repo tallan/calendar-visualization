@@ -1,0 +1,192 @@
+{
+    "dataRoles": [
+        {
+            "displayName": "Date",
+            "name": "Category",
+            "kind": "Grouping",
+            "description": "Grouping of discrete dates"
+        },
+        {
+            "displayName": "Values",
+            "name": "Y",
+            "kind": "Measure",
+            "description": "Numeric data values"
+        }
+    ],
+    "drilldown": {
+        "roles": ["Category"]
+    },
+    "tooltips": {
+        "supportedTypes": {
+            "default": true,
+            "canvas": true
+        },
+        "roles": [
+            "tooltips"
+        ]
+    },
+    "dataViewMappings": [
+        {
+            "conditions": [
+                {
+                    "Category": {
+                        "max": 1
+                    },
+                    "Y": {
+                        "max": 1
+                    }
+                }
+            ],
+            "categorical": {
+                "categories": {
+                    "for": {
+                        "in": "Category"
+                    }
+                },
+                "values": {
+                    "group": {
+                        "by": "Series",
+                        "select": [
+                            {
+                                "bind": {
+                                    "to": "Y"
+                                }
+                            }
+                        ],
+                        "dataReductionAlgorithm": {
+                            "top": {}
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "objects": {
+        "calendar": {
+            "displayName": "Calendar Configurations",
+            "properties": {
+                "weekStartDay": {
+                    "displayName": "Week Start",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "0",
+                                "displayName": "Sunday"
+                            },
+                            {
+                                "value": "1",
+                                "displayName": "Monday"
+                            },
+                            {
+                                "value": "2",
+                                "displayName": "Tuesday"
+                            },
+                            {
+                                "value": "3",
+                                "displayName": "Wednesday"
+                            },
+                            {
+                                "value": "4",
+                                "displayName": "Thursday"
+                            },
+                            {
+                                "value": "5",
+                                "displayName": "Friday"
+                            },
+                            {
+                                "value": "6",
+                                "displayName": "Saturday"
+                            }
+                        ]
+                    }
+                },
+                "numberColumns": {
+                    "displayName": "Columns",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
+        },
+        "dataPoint": {
+            "displayName": "Data colors",
+            "properties": {
+                "defaultColor": {
+                    "displayName": "Default color",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "diverging": {
+            "displayName": "Diverging colors",
+            "properties": {
+                "diverging": {
+                    "displayName": "Diverging",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "minColor": {
+                    "displayName": "Minimum",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": {
+                                    "nullable": true
+                                }
+                            }
+                        }
+                    }
+                },
+                "centerColor": {
+                    "displayName": "Center",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": {
+                                    "nullable": true
+                                }
+                            }
+                        }
+                    }
+                },
+                "maxColor": {
+                    "displayName": "Maximum",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": {
+                                    "nullable": true
+                                }
+                            }
+                        }
+                    }
+                },
+                "minValue": {
+                    "displayName": "Minimum",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "centerValue": {
+                    "displayName": "Center",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "maxValue": {
+                    "displayName": "Maximum",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
+        }
+    }
+}
