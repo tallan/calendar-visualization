@@ -1,5 +1,5 @@
-module powerbi.extensibility.visual{
-    
+module powerbi.extensibility.visual {
+
     /** 
      * manages date selections and zoom views 
      * @class
@@ -27,6 +27,43 @@ module powerbi.extensibility.visual{
         }
 
         /**
+         * Registers a callback method to be called whenever a bookmark is loaded.
+         * @method
+         * @param {CalendarViewModel} viewModel Model representing current calendar view.
+         */
+        registerOnSelectCallback(viewModel: CalendarViewModel) {
+            this.selectionManager.registerOnSelectCallback((ids: visuals.ISelectionId[]) => {
+
+                let dataPoints: DataPoint[] = viewModel.drillDownInfo.isDrillDown ? viewModel.drillDownDataPoints : viewModel.dataPoints;
+                let idkeyex = JSON.stringify(ids[0]["dataMap"]) + '[]';
+                let datakeyex = dataPoints[31].selectionId.getKey();
+                console.log(idkeyex);
+                console.log(datakeyex);
+                console.log(idkeyex == datakeyex);
+                debugger;
+                let d = d3.selectAll('.day')
+                    .filter((data: DataPoint) => ids.some(id => data.selectionId.getKey() == JSON.stringify(id["dataMap"]) + '[]'))
+                    .classed('selected-rect', true)
+                    .attr('stroke', DATE_SELECTED_COLOR)
+                    .each(function () {
+                        this.parentNode.appendChild(this);
+                    });
+
+
+                // selects all tiles.... how do we filter to only selected???
+                // d3.selectAll('.day')
+                // .attr({
+                //     'stroke': DATE_SELECTED_COLOR
+                // }).each(function () {
+                //     // Move selection to front
+                //     this.parentNode.appendChild(this);
+                // });
+                this.isBookmark = true;
+                console.log(this.isBookmark);
+            });
+        }
+
+        /**
          * Adds the SelectionIds for the current month/year to the selection manager
          * @method
          * @param {CalendarViewModel} viewModel -the calendar view model
@@ -40,7 +77,7 @@ module powerbi.extensibility.visual{
                 if (dp.selectionId != null) {
                     selectedIds.push(dp.selectionId);
                 }
-            }); 
+            });
 
             this.selectionManager.select(selectedIds);
         }
@@ -58,9 +95,171 @@ module powerbi.extensibility.visual{
                 if (dp.selectionId != null) {
                     selectedIds.push(dp.selectionId);
                 }
-            }); 
+            });
 
             this.selectionManager.select(selectedIds);
+        }
+
+        /**
+         * Add selection capabilities to datapoints
+         * @method @private
+         * @param {d3.Selection<SVGElement} calendarContainerGroup selection element for current calendar view
+         * @param {CalendarDataPoint[]} dataPoints  -datapoints to add selections to
+         */
+        public addSelections(calendarContainerGroup: d3.Selection<SVGElement>, viewModel: CalendarViewModel) {
+            // Add Selections
+            let self = this;
+            let selectedIds: ISelectionId[] = [];
+            let singleSelect = false;
+            let dayRects = calendarContainerGroup.selectAll('.day');
+
+            dayRects.on('click', function (d: CalendarDataPoint) {
+                let wasMultiSelect = d3.selectAll('.selected-rect').size() > 1;
+                let minShift = d.date;
+                let maxShift = d.date;
+                let currentClickDate = d.date;
+                if (d.selectionId != null) {
+                    let mouseEvent = d3.event as MouseEvent;
+                    // For 'Ctrl' press - Add new existing selections, but remove if prexisted
+                    if (mouseEvent.ctrlKey && !mouseEvent.shiftKey) {
+                        singleSelect = false;
+                        let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
+                        if (isSelected) {
+                            selectedIds = _.filter(selectedIds, function (sid: ISelectionId) { return sid != d.selectionId; });
+                        }
+                        else {
+                            selectedIds.push(d.selectionId);
+                        }
+                        self.setAnchor(d.date);
+                    }
+                    else if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
+                        // For 'Shift, get range of dates
+                        // Remove Selected Date Rect Class and set to unselected
+                        d3.selectAll('.day').classed('selected-rect', false).attr({
+                            'stroke': DATE_UNSELECTED_COLOR
+                        });
+                        let anchor = self.getAnchor();
+                        if (anchor == null) {
+                            self.setAnchor(d.date);
+                            anchor = currentClickDate;
+                        }
+                        minShift = currentClickDate < anchor ? currentClickDate : anchor;
+                        maxShift = currentClickDate > anchor ? currentClickDate : anchor;
+                        selectedIds = [];
+                        // Get all selection Ids between the min and max dates
+                        let selectedDataPoints: CalendarDataPoint[] = _.filter(viewModel.dataPoints, function (dataPoint) {
+                            return dataPoint.date >= minShift && dataPoint.date <= maxShift;
+                        });
+                        _.each(selectedDataPoints, function (dp: CalendarDataPoint) {
+                            if (dp.selectionId != null) {
+                                selectedIds.push(dp.selectionId);
+                            }
+                        });
+                    }
+                    // Single Select
+                    else {
+                        singleSelect = true;
+                        if (selectedIds.length) {
+                            selectedIds = [];
+                        }
+                        selectedIds.push(d.selectionId);
+                        self.setAnchor(d.date);
+                    }
+
+                    // Allow selection only if visual is rendered in a view that supports interactivty (e.g. Reports)
+                    self.selectionManager.select(selectedIds).then((ids: ISelectionId[]) => {
+                        if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
+                            d3.selectAll('.day').filter(function (d) {
+                                let cdp: CalendarDataPoint = d;
+                                return cdp.date >= minShift && cdp.date <= maxShift ? true : false;
+                            }).classed('selected-rect', true).attr({
+                                'stroke': DATE_SELECTED_COLOR
+                            }).each(function () {
+                                // Move selection to front
+                                this.parentNode.appendChild(this);
+                            });
+                        }
+                        else {
+                            let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
+                            if (singleSelect) {
+                                // If single click remove all selected style
+                                d3.selectAll('.day').classed('selected-rect', false);
+                            }
+                            if (!isSelected || (singleSelect && wasMultiSelect)) {
+                                d3.select(this).classed('selected-rect', true);
+                            }
+                            else {
+                                d3.select(this).classed('selected-rect', false);
+                            }
+                            // Unselect all days
+                            d3.selectAll('.day').attr({ 'stroke': DATE_UNSELECTED_COLOR })
+                            // Select all rects with selected-rect class
+                            d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
+                                .each(function () {
+                                    // Move selection to front
+                                    this.parentNode.appendChild(this);
+                                });
+                        }
+                    });
+
+                }
+                // Month Zoom Specific
+                if (ZoomLevel.MONTH == self.getZoomLevel()) {
+                    // Insure Day Numbers are rendered first
+                    calendarContainerGroup.selectAll('.dayNumberBox').each(function () {
+                        // Move selection to front
+                        this.parentNode.appendChild(this);
+                    })
+                    calendarContainerGroup.selectAll('.dayNumber').each(function () {
+                        // Move selection to front
+                        this.parentNode.appendChild(this);
+                    })
+
+                    let selectedRectsInMonth = d3.selectAll('.selected-rect');
+                    if (selectedRectsInMonth[0].length == 0) {
+                        self.selectMonth(viewModel, self.getSelectedMonth(), self.getSelectedYear());
+                    }
+                }
+            });
+        }
+
+        /**
+        * Adds selection capabilities to each data point on a drill dwon view.
+        * @method @private
+        * @param {d3.Selection<SVGElement>} calendarContainerGroup selection element for the calendar container group
+        * @param {DateDataPoint} dataPoints    -data points to add selection capabilities to
+        */
+        public addDrillDownSelections(calendarContainerGroup: d3.Selection<SVGElement>, dataPoints: DateDataPoint[]) {
+            // Add Selections
+            let self = this;
+            let yearRects = calendarContainerGroup.selectAll('.calendarPoint');
+            yearRects.on('click', function (d) {
+                // Check to see if previously selected
+                let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
+                // Selection Power BI data points
+                self.selectionManager
+                    .select(d.selectionId)
+                    .then((ids: ISelectionId[]) => {
+                        d3.selectAll('.calendarPoint').classed('selected-rect', false).attr({
+                            'stroke': DATE_UNSELECTED_COLOR
+                        });
+                        if (!isSelected) {
+                            d3.select(this).classed('selected-rect', true).attr({
+                                'stroke': DATE_SELECTED_COLOR
+                            }).each(function () {
+                                // Move selection to front
+                                this.parentNode.appendChild(this);
+                            });
+                        }
+                        else {
+                            d3.select(this).classed('selected-rect', false);
+                        }
+                        calendarContainerGroup.selectAll('.calendarPointLabel').each(function () {
+                            // Move selection to front
+                            this.parentNode.appendChild(this);
+                        })
+                    });
+            });
         }
 
         /**
@@ -69,14 +268,14 @@ module powerbi.extensibility.visual{
          * @returns {ZoomLevel} -enumerator representing current zoom level
          */
         getZoomLevel(): ZoomLevel {
-             return this.zoomLevel;
-         }
+            return this.zoomLevel;
+        }
 
         /**
          * sets the current zoom level in this state manager
          * @param {ZoomLevel} zoomLevel -enumerator representing new zoom level}
          */
-        setZoomLevel(zoomLevel: ZoomLevel) { 
+        setZoomLevel(zoomLevel: ZoomLevel) {
             this.zoomLevel = zoomLevel;
         }
 
@@ -87,7 +286,7 @@ module powerbi.extensibility.visual{
          * @param {number} monthNumber  -selected month
          * @param {number} yearNumber   -selected year
          */
-        setMonthZoom(zoomLevel: ZoomLevel, monthNumber: number, yearNumber: number){
+        setMonthZoom(zoomLevel: ZoomLevel, monthNumber: number, yearNumber: number) {
             this.zoomLevel = ZoomLevel.MONTH;
             this.selectedMonth = monthNumber;
             this.selectedYear = yearNumber;
@@ -98,7 +297,7 @@ module powerbi.extensibility.visual{
          * @method
          * @returns {Month} -selected month
          */
-        getSelectedMonth(): Month { 
+        getSelectedMonth(): Month {
             return this.selectedMonth;
         }
 
@@ -107,7 +306,7 @@ module powerbi.extensibility.visual{
          * @method
          * @returns {number}    -selected year
          */
-        getSelectedYear(): number { 
+        getSelectedYear(): number {
             return this.selectedYear;
         }
 
@@ -127,7 +326,7 @@ module powerbi.extensibility.visual{
          * @method
          * @param {Date} anchor    -given date
          */
-        setAnchor(anchor: Date){
+        setAnchor(anchor: Date) {
             this.anchorSelection = anchor;
         }
 
@@ -136,7 +335,7 @@ module powerbi.extensibility.visual{
          * @method
          * @returns {Date}  -a date which is the selected anchor
          */
-        getAnchor(): Date{
+        getAnchor(): Date {
             return this.anchorSelection;
         }
 
@@ -145,7 +344,7 @@ module powerbi.extensibility.visual{
          * @method
          * @param {Date} date   -date to set as last clicked
          */
-        setLastClickedDate(date: Date){
+        setLastClickedDate(date: Date) {
             this.lastClickedDate = date;
         }
 
@@ -154,8 +353,16 @@ module powerbi.extensibility.visual{
          * @method
          * @returns {Date} -the date last clicked
          */
-        getLastClickedDate(){
+        getLastClickedDate(): Date {
             return this.lastClickedDate;
+        }
+
+        getSelectionIds(): ISelectionId[] {
+            return this.selectionManager.getSelectionIds();
+        }
+
+        clearSelections() {
+            this.selectionManager.clear();
         }
     }
 }

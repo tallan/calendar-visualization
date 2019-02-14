@@ -12,6 +12,7 @@ module powerbi.extensibility.visual {
         minimumDate: Date;
         maximumDate: Date;
         drillDownInfo: DrillDownInformation;
+        isLandingPage: boolean;
     };
 
     /**

@@ -17,14 +17,7 @@ module powerbi.extensibility.visual {
             let tooltipServiceWrapper = new TooltipServiceWrapper(this.host.tooltipService, options.element);
             // For scrollable
             options.element.style.overflow = 'auto';
-
-            let calendarSVG = d3.select(options.element)
-                .append('svg')
-                .classed('calendarSVG', true);
-            let calendarContainerGroup = calendarSVG.append('g')
-                .classed('calendarContainer', true);
-
-            this.viewManager = new ViewManager(calendarSVG, calendarContainerGroup, tooltipServiceWrapper, stateManager);
+            this.viewManager = new ViewManager(tooltipServiceWrapper, stateManager, options);
         }
 
         /**
@@ -41,18 +34,8 @@ module powerbi.extensibility.visual {
             // Build View Model
             let viewModel = this.visualTransform(options, this.host);
 
-            d3.selectAll('.calendarContainer').remove();
-            let svg = this.viewManager.calendarSVG;
-            this.viewManager.calendarContainerGroup = svg.append('g').classed('calendarContainer', true);
-
             // Render appropriate Zoom level
             this.viewManager.renderCalendar(options, viewModel);
-            // Select all rects with selected-rect class
-            d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
-                .each(function () {
-                    // Move selection to front
-                    this.parentNode.appendChild(this);
-                });
         }
 
         /** 
@@ -164,9 +147,9 @@ module powerbi.extensibility.visual {
                     allowStandardCalendar: false,
                     dates: [],
                     labels: []
-                }
+                },
+                isLandingPage: false
             }
-
             if (!dataViews
                 || !dataViews[0]
                 || !dataViews[0].categorical
@@ -174,6 +157,7 @@ module powerbi.extensibility.visual {
                 || !dataViews[0].categorical.categories[0].source
                 || !dataViews[0].categorical.values
                 || dataViews[0].categorical.categories[0].values.length == 0) {
+                viewModel.isLandingPage = true;
                 return viewModel;
             }
 
@@ -202,7 +186,7 @@ module powerbi.extensibility.visual {
 
             // Get Data Point Color
             let dataPointColor = configurations.dataPoint.solid.color as string;
-
+            
             let dates: Date[] = dataViews[0].categorical.categories[0].values as Date[];
             const values: number[] = dataViews[0].categorical.values[0].values as number[];
             let drillDownInfo: DrillDownInformation = checkDrillDownRequirements(dataViews, dates);
