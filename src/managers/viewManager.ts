@@ -37,7 +37,6 @@ module powerbi.extensibility.visual {
             this.viewModel = viewModel;
             this.options = options;
             let currentZoomLevel = this.stateManager.getZoomLevel();
-            debugger;
             this.layoutConfig = new LayoutConfiguration(options, viewModel, currentZoomLevel);
             if (this.viewModel.isLandingPage) {
                 if (!this.isLandingPageOn || options.dataViews[0].metadata.columns.length >= 3) {
@@ -52,6 +51,7 @@ module powerbi.extensibility.visual {
                 }
             }
             else {
+                
                 if (this.isLandingPageOn && !this.viewModel.isLandingPage) {
                     this.isLandingPageOn = false;
                     this.landingPage.remove();
@@ -164,6 +164,7 @@ module powerbi.extensibility.visual {
                 .attr('x', monthHorizontalOffset).attr('y', monthVerticalOffset)
                 .attr('fill', Color[Color.GREY])
                 .text(monthLabel)
+                .attr('font-family', this.viewModel.configurations.font)
                 .on('mouseover', function () { addMonthHoverStyling.call(this, (self.viewModel.configurations.dataPoint.solid.color as string)); })
                 .on('mouseout', removeMonthHoverStyling)
                 .on('click', function () {
@@ -183,7 +184,8 @@ module powerbi.extensibility.visual {
                     .attr('x', (dayLabelConfig.configuredDayIndex * self.layoutConfig.calendarDateRectSize) + monthHorizontalOffset)
                     .attr('y', monthVerticalOffset + 15)
                     .attr('fill', Color[Color.GREY])
-                    .text(dayLabel.dayLabel);
+                    .text(dayLabel.dayLabel)
+                    .attr('font-family', this.viewModel.configurations.font);
             }
 
             let dayRects = this.calendarContainerGroup.selectAll('.day' + monthIndex).data(dataPoints);
@@ -289,7 +291,8 @@ module powerbi.extensibility.visual {
                 .attr('font-size', this.layoutConfig.calendarDateRectSize * this.layoutConfig.monthTitleRatio)
                 .attr('x', LEFT_PAD_MONTH_ZOOM + 70).attr('y', TOP_PAD_MONTH_ZOOM - 40)
                 .attr('fill', Color[Color.GREY])
-                .text(`${selectedMonth} ${selectedYear}`);
+                .text(`${selectedMonth} ${selectedYear}`)
+                .attr('font-family', this.viewModel.configurations.font);
             // Render Day labels            
             for (let dayLabel of this.viewModel.dayIndexingArray) {
                 let dayLabelConfig: DayConfiguation = dayLabel;
@@ -298,7 +301,8 @@ module powerbi.extensibility.visual {
                     .attr('font-size', this.layoutConfig.calendarDateRectSize * this.layoutConfig.monthTitleRatio)
                     .attr('x', (dayLabelConfig.configuredDayIndex * this.layoutConfig.calendarDateRectSize) + 50).attr('y', 100)
                     .attr('fill', Color[Color.GREY])
-                    .text(dayLabel.dayLabel);
+                    .text(dayLabel.dayLabel)
+                    .attr('font-family', this.viewModel.configurations.font);
             }
 
             let monthDataPoints: CalendarDataPoint[] = _.filter(this.viewModel.dataPoints, function (dataPoint) { return dataPoint.month == monthNumber && dataPoint.year == yearNumber; });
@@ -353,7 +357,8 @@ module powerbi.extensibility.visual {
                     const rectY = this.setYCoordinateOfDay(date, 100, ZoomLevel.MONTH, self.viewModel.configurations.weekStartDay, self.viewModel.dayIndexingArray);;
                     return rectY;
                 })
-                .text((date: Date) => { return date.getDate(); });
+                .text((date: Date) => { return date.getDate(); })
+                .attr('font-family', this.viewModel.configurations.font);
 
             this.stateManager.addSelections(this.calendarContainerGroup, this.viewModel);
             this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.day'),
@@ -427,6 +432,7 @@ module powerbi.extensibility.visual {
                         let label = formatMonthCategory(categoryLabels[i]);
                         d3.select(this).append("tspan")
                             .text(label)
+                            .attr('font-family', self.viewModel.configurations.font)
                             .attr("x", (data: DateDataPoint) => {
                                 if (label.length <= 2) {
                                     return centerOfRect - (fontSize * .5);
@@ -445,7 +451,7 @@ module powerbi.extensibility.visual {
                             })
                             .attr("font-size", (data: DateDataPoint) => {
                                 return fontSize;
-                            })
+                            });
                     }
                 });
 

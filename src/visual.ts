@@ -82,7 +82,8 @@ module powerbi.extensibility.visual {
                         selector: null,
                         properties: {
                             weekStartDay: calendarConfiguration.weekStartDay,
-                            scrollDirection: calendarConfiguration.scrollDirection
+                            scrollDirection: calendarConfiguration.scrollDirection,
+                            font: calendarConfiguration.font
                         }
                     })
                     if (calendarConfiguration.scrollDirection == 1 /*Horizontal - rows*/) {
@@ -131,7 +132,8 @@ module powerbi.extensibility.visual {
                     minValue: null,
                     centerValue: null,
                     maxValue: null
-                }
+                },
+                font: 'Segoe UI'
             };
 
             // Default View Model
@@ -178,7 +180,8 @@ module powerbi.extensibility.visual {
                     minValue: getValue<number>(objects, 'diverging', 'minValue', defaultConfig.diverging.minValue),
                     centerValue: getValue<number>(objects, 'diverging', 'centerValue', defaultConfig.diverging.centerValue),
                     maxValue: getValue<number>(objects, 'diverging', 'maxValue', defaultConfig.diverging.maxValue),
-                }
+                },
+                font: getValue<string>(objects, 'calendar', 'font', defaultConfig.font)
             }
             viewModel.configurations = calendarConfig;
             let configurations = calendarConfig;
