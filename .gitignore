@@ -1,4 +1,0 @@
-# Do not include in GIT
-.npmignore
-devenv-setup.md
-docs.txt
