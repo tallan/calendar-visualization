@@ -21,7 +21,6 @@ module powerbi.extensibility.visual {
                 .classed('calendarSVG', true);
             this.tooltipServiceWrapper = tooltipServiceWrapper;
             this.stateManager = stateManager;
-            // this.stateManager.registerOnSelectCallback(this.viewModel);
         }
 
         /**
