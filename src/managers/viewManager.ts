@@ -31,7 +31,6 @@ module powerbi.extensibility.visual {
                 console.log(idkeyex);
                 console.log(datakeyex);
                 console.log(idkeyex == datakeyex);
-                debugger;
                 let d = d3.selectAll('.day')
                     .filter((data: DataPoint) => ids.some(id => data.selectionId.getKey() == JSON.stringify(id["dataMap"]) + '[]'))
                     .classed('selected-rect', true)
@@ -40,15 +39,6 @@ module powerbi.extensibility.visual {
                         this.parentNode.appendChild(this);
                     });
 
-
-                // selects all tiles.... how do we filter to only selected???
-                // d3.selectAll('.day')
-                // .attr({
-                //     'stroke': DATE_SELECTED_COLOR
-                // }).each(function () {
-                //     // Move selection to front
-                //     this.parentNode.appendChild(this);
-                // });
                 this.stateManager.isBookmark = true;
                 console.log(this.stateManager.isBookmark);
             });
@@ -365,61 +355,6 @@ module powerbi.extensibility.visual {
             let selectedIds: ISelectionId[] = [];
             let singleSelect = false;
             let dayRects = this.calendarContainerGroup.selectAll('.day');
-
-            // dayRects.on('touchstart', function (d: CalendarDataPoint) {
-            //     let touchevent = d3.event as TouchEvent;
-            //     touchevent.preventDefault();
-            //     if (touchevent.touches.length == 1 && touchevent.targetTouches.length > 0) {
-            //         selectedIds.push(d.selectionId);
-            //     }
-            // });
-
-            // dayRects.on('touchmove', function (d: CalendarDataPoint) {
-            //     selectedIds.push(d.selectionId);
-            // });
-
-            // dayRects.on('touchend', function (d: CalendarDataPoint) {
-            //     debugger;
-            //     self.selectionManager.select(selectedIds).then((ids: ISelectionId[]) => {
-            //         d3.selectAll('.day').filter(function (d: CalendarDataPoint) {
-            //             return ids.some(id => id["key"] == d.selectionId.getKey())
-            //         })
-            //             .classed('selected-rect', true).attr({
-            //                 'stroke': DATE_SELECTED_COLOR
-            //             })
-            //             .each(function () {
-            //                 // Move selection to front
-            //                 this.parentNode.appendChild(this);
-            //             });
-            //         // Unselect all days
-            //         d3.selectAll('.day').attr({ 'stroke': DATE_UNSELECTED_COLOR })
-            //         // Select all rects with selected-rect class
-            //         d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
-            //             .each(function () {
-            //                 // Move selection to front
-            //                 this.parentNode.appendChild(this);
-            //             });
-            //     });
-            //     // Month Zoom Specific
-            //     if (ZoomLevel.MONTH == self.stateManager.getZoomLevel()) {
-            //         // Insure Day Numbers are rendered first
-            //         self.calendarContainerGroup.selectAll('.dayNumberBox')
-            //             .each(function () {
-            //                 // Move selection to front
-            //                 this.parentNode.appendChild(this);
-            //             });
-            //         self.calendarContainerGroup.selectAll('.dayNumber')
-            //             .each(function () {
-            //                 // Move selection to front
-            //                 this.parentNode.appendChild(this);
-            //             });
-
-            //         let selectedRectsInMonth = d3.selectAll('.selected-rect');
-            //         if (selectedRectsInMonth[0].length == 0) {
-            //             self.stateManager.selectMonth(self.viewModel, self.stateManager.getSelectedMonth(), self.stateManager.getSelectedYear());
-            //         }
-            //     }
-            // });
 
             dayRects.on('click', function (d: CalendarDataPoint) {
                 let wasMultiSelect = d3.selectAll('.selected-rect').size() > 1;
