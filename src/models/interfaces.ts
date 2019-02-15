@@ -70,7 +70,8 @@ module powerbi.extensibility.visual {
         numberColumns: number,
         defaultNumberColumns: number,
         numberRows: number,
-        diverging: DivergingColorsConfig
+        diverging: DivergingColorsConfig,
+        font: string
     }
 
     /** 

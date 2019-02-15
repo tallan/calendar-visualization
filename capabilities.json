@@ -106,6 +106,24 @@
                     "type": {
                         "numeric": true
                     }
+                },
+                "font": {
+                    "displayName": "Font",
+                    "type": {
+                        "enumeration": [
+                            { "value": "Arial", "displayName": "Arial" },
+                            { "value": "Bookman", "displayName": "Bookman" },
+                            { "value": "Courier", "displayName": "Courier" },
+                            { "value": "Garmond", "displayName": "Garmond" },
+                            { "value": "Georgia", "displayName": "Georgia" },
+                            { "value": "Helvetica", "displayName": "Helvetica" },
+                            { "value": "Impact", "displayName": "Impact" },
+                            { "value": "Palatino", "displayName": "Palatino" },
+                            { "value": "Segoe UI", "displayName": "Segoe UI" },
+                            { "value": "Times", "displayName": "Times"},
+                            { "value": "Trebuchet MS", "displayName": "Trebuchet MS" }
+                        ]
+                    }
                 }
             }
         },
