@@ -1,47 +1,26 @@
 module powerbi.extensibility.visual {
     /**Creates views for individual zoom levels and drilldowns */
     export class ViewManager {
+        private element: HTMLElement;
         public calendarSVG: d3.Selection<SVGElement>;
         public calendarContainerGroup: d3.Selection<SVGElement>;
+        private landingPage: d3.Selection<HTMLImageElement>;
         public viewModel: CalendarViewModel;
         public layoutConfig: LayoutConfiguration;
         public yearViewLayout: YearViewLayoutConfiguration;
         public tooltipServiceWrapper: ITooltipServiceWrapper;
         public stateManager: StateManager;
-        public selectionManager: ISelectionManager;
         public options: VisualUpdateOptions;
+        private isLandingPageOn: boolean;
 
-        constructor(calendarSVG: d3.Selection<SVGElement>,
-            calendarContainerGroup: d3.Selection<SVGElement>,
-            tooltipServiceWrapper: ITooltipServiceWrapper,
-            stateManager: StateManager
-        ) {
-            let self = this;
-            this.calendarSVG = calendarSVG;
-            this.calendarContainerGroup = calendarContainerGroup;
+
+        constructor(tooltipServiceWrapper: ITooltipServiceWrapper, stateManager: StateManager, options: VisualConstructorOptions) {
+            this.element = options.element;
+            this.calendarSVG = d3.select(this.element)
+                .append('svg')
+                .classed('calendarSVG', true);
             this.tooltipServiceWrapper = tooltipServiceWrapper;
             this.stateManager = stateManager;
-            this.selectionManager = stateManager.selectionManager;
-
-            this.selectionManager.registerOnSelectCallback((ids: visuals.ISelectionId[]) => {
-   
-                let dataPoints: DataPoint[] = this.viewModel.drillDownInfo.isDrillDown ? this.viewModel.drillDownDataPoints : this.viewModel.dataPoints;
-                let idkeyex = JSON.stringify(ids[0]["dataMap"]) + '[]';
-                let datakeyex = dataPoints[31].selectionId.getKey();
-                console.log(idkeyex);
-                console.log(datakeyex);
-                console.log(idkeyex == datakeyex);
-                let d = d3.selectAll('.day')
-                    .filter((data: DataPoint) => ids.some(id => data.selectionId.getKey() == JSON.stringify(id["dataMap"]) + '[]'))
-                    .classed('selected-rect', true)
-                    .attr('stroke', DATE_SELECTED_COLOR)
-                    .each(function() {
-                        this.parentNode.appendChild(this);
-                    });
-
-                this.stateManager.isBookmark = true;
-                console.log(this.stateManager.isBookmark);
-            });
         }
 
         /**
@@ -53,22 +32,57 @@ module powerbi.extensibility.visual {
          * @param selectionManager 
          */
         renderCalendar(options: VisualUpdateOptions, viewModel: CalendarViewModel) {
+            this.calendarSVG.remove();
             this.viewModel = viewModel;
             this.options = options;
             let currentZoomLevel = this.stateManager.getZoomLevel();
             this.layoutConfig = new LayoutConfiguration(options, viewModel, currentZoomLevel);
-            if (viewModel.drillDownInfo.isDrillDown) {
-                this.yearViewLayout = new YearViewLayoutConfiguration(options.viewport.width, options.viewport.height, viewModel.configurations, viewModel.drillDownDataPoints.length);
-                this.renderDrillDownView();
+            if (this.viewModel.isLandingPage) {
+                if (!this.isLandingPageOn || options.dataViews[0].metadata.columns.length >= 3) {
+                    this.isLandingPageOn = true;
+                    this.landingPage = d3.select(this.element)
+                        .append('img')
+                        .classed('logo', true)
+                        .attr('src', 'https://az158878.vo.msecnd.net/marketing/Partner_21474846645/Product_42949681214/Asset_dbf7b83c-c0dc-4293-88c2-11bbc2f5dad5/CalendarVisualizationLogo300x3.png')
+                        .attr('width', '100%')
+                        .attr('height', 'auto')
+                        .attr('object-fit', 'contain');
+                }
             }
             else {
-                if (currentZoomLevel === ZoomLevel.ALL) {
-                    this.renderAllZoom();
+                if (this.isLandingPageOn && !this.viewModel.isLandingPage) {
+                    this.isLandingPageOn = false;
+                    this.landingPage.remove();
                 }
-                else if (currentZoomLevel == ZoomLevel.MONTH) {
-                    this.renderMonthZoom(this.stateManager.getSelectedMonth(), this.stateManager.getSelectedYear());
+                if (!this.isLandingPageOn && !this.viewModel.isLandingPage) {
+                    this.calendarSVG = d3.select(this.element)
+                        .append('svg')
+                        .classed('calendarSVG', true);
+                    this.calendarContainerGroup = this.calendarSVG.append('g')
+                        .classed('calendarContainer', true);
+
+                    if (viewModel.drillDownInfo.isDrillDown) {
+                        this.yearViewLayout = new YearViewLayoutConfiguration(options.viewport.width, options.viewport.height, viewModel.configurations, viewModel.drillDownDataPoints.length);
+                        this.renderDrillDownView();
+                    }
+                    else {
+                        if (currentZoomLevel === ZoomLevel.ALL) {
+                            this.renderAllZoom();
+                        }
+                        else if (currentZoomLevel == ZoomLevel.MONTH) {
+                            this.renderMonthZoom(this.stateManager.getSelectedMonth(), this.stateManager.getSelectedYear());
+                        }
+                        
+                    }
+                    // Select all rects with selected-rect class
+                    d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
+                    .each(function () {
+                        // Move selection to front
+                        this.parentNode.appendChild(this);
+                    });
                 }
             }
+
         }
 
         /**
@@ -83,6 +97,7 @@ module powerbi.extensibility.visual {
             d3.selectAll('.calendarContainer').remove();
             let svg = this.calendarSVG;
             this.calendarContainerGroup = svg.append('g').classed('calendarContainer', true);
+
             let scrollDirection = this.viewModel.configurations.scrollDirection;
             let numberOfMonths: number = this.layoutConfig.numberOfMonths;
             this.layoutConfig = new LayoutConfiguration(this.options, this.viewModel, ZoomLevel.ALL)
@@ -118,7 +133,7 @@ module powerbi.extensibility.visual {
                 }
             }
 
-            this.addSelections(this.viewModel.dataPoints);
+            this.stateManager.addSelections(this.calendarContainerGroup, this.viewModel);
             this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.day'),
                 (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => getTooltipData(tooltipEvent.data),
                 (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => tooltipEvent.data.selectionId);
@@ -136,7 +151,7 @@ module powerbi.extensibility.visual {
          */
         private renderMonth(dataPoints: CalendarDataPoint[], monthNumber: number, yearNumber: number, monthIndex: number, columnNumber: number, rowNumber: number) {
             let monthLabel = Month[monthNumber] + ' ' + yearNumber;
-            let selections = this.selectionManager.getSelectionIds();
+            let selections = this.stateManager.getSelectionIds();
             let monthHorizontalOffset = columnNumber == 1 ? this.layoutConfig.horizontalMonthPadding : (this.layoutConfig.calendarDateRectSize * 7 * (columnNumber - 1)) + (this.layoutConfig.horizontalMonthPadding * columnNumber); // Considers size of calendar, and padding between months;
             let monthVerticalOffset = rowNumber == 1 ? this.layoutConfig.verticalMonthPadding : (this.layoutConfig.calendarDateRectSize * 7 * (rowNumber - 1)) + (20 * rowNumber) + this.layoutConfig.verticalMonthPadding;
             let self = this;
@@ -338,130 +353,10 @@ module powerbi.extensibility.visual {
                 })
                 .text((date: Date) => { return date.getDate(); });
 
-            this.addSelections(monthDataPoints);
+            this.stateManager.addSelections(this.calendarContainerGroup, this.viewModel);
             this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.day'),
                 (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => getTooltipData(tooltipEvent.data),
                 (tooltipEvent: TooltipEventArgs<CalendarDataPoint>) => tooltipEvent.data.selectionId);
-        }
-
-        /**
-         * Add selection capabilities to datapoints
-         * @method @private
-         * @param {CalendarDataPoint[]} dataPoints  -datapoints to add selections to
-         */
-        private addSelections(dataPoints: CalendarDataPoint[]) {
-            // Add Selections
-            let self = this;
-            let selectedIds: ISelectionId[] = [];
-            let singleSelect = false;
-            let dayRects = this.calendarContainerGroup.selectAll('.day');
-
-            dayRects.on('click', function (d: CalendarDataPoint) {
-                let wasMultiSelect = d3.selectAll('.selected-rect').size() > 1;
-                let minShift = d.date;
-                let maxShift = d.date;
-                let currentClickDate = d.date;
-                if (d.selectionId != null) {
-                    let mouseEvent = d3.event as MouseEvent;
-                    // For 'Ctrl' press - Add new existing selections, but remove if prexisted
-                    if (mouseEvent.ctrlKey && !mouseEvent.shiftKey) {
-                        singleSelect = false;
-                        let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
-                        if (isSelected) {
-                            selectedIds = _.filter(selectedIds, function (sid: ISelectionId) { return sid != d.selectionId; });
-                        }
-                        else {
-                            selectedIds.push(d.selectionId);
-                        }
-                        self.stateManager.setAnchor(d.date);
-                    }
-                    else if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
-                        // For 'Shift, get range of dates
-                        // Remove Selected Date Rect Class and set to unselected
-                        d3.selectAll('.day').classed('selected-rect', false).attr({
-                            'stroke': DATE_UNSELECTED_COLOR
-                        });
-                        let anchor = self.stateManager.getAnchor();
-                        if (anchor == null) {
-                            self.stateManager.setAnchor(d.date);
-                            anchor = currentClickDate;
-                        }
-                        minShift = currentClickDate < anchor ? currentClickDate : anchor;
-                        maxShift = currentClickDate > anchor ? currentClickDate : anchor;
-                        selectedIds = [];
-                        // Get all selection Ids between the min and max dates
-                        let selectedDataPoints: CalendarDataPoint[] = _.filter(dataPoints, function (dataPoint) { return dataPoint.date >= minShift && dataPoint.date <= maxShift; });
-                        _.each(selectedDataPoints, function (dp: CalendarDataPoint) {
-                            if (dp.selectionId != null) {
-                                selectedIds.push(dp.selectionId);
-                            }
-                        });
-                    }
-                    // Single Select
-                    else {
-                        singleSelect = true;
-                        if (selectedIds.length) {
-                            selectedIds = [];
-                        }
-                        selectedIds.push(d.selectionId);
-                        self.stateManager.setAnchor(d.date);
-                    }
-
-                    // Allow selection only if visual is rendered in a view that supports interactivty (e.g. Reports)
-                    self.selectionManager.select(selectedIds).then((ids: ISelectionId[]) => {
-                        if (!mouseEvent.ctrlKey && mouseEvent.shiftKey) {
-                            d3.selectAll('.day').filter(function (d) {
-                                let cdp: CalendarDataPoint = d;
-                                return cdp.date >= minShift && cdp.date <= maxShift ? true : false;
-                            }).classed('selected-rect', true).attr({
-                                'stroke': DATE_SELECTED_COLOR
-                            }).each(function () {
-                                // Move selection to front
-                                this.parentNode.appendChild(this);
-                            });
-                        }
-                        else {
-                            let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
-                            if (singleSelect) {
-                                // If single click remove all selected style
-                                d3.selectAll('.day').classed('selected-rect', false);
-                            }
-                            if (!isSelected || (singleSelect && wasMultiSelect)) {
-                                d3.select(this).classed('selected-rect', true);
-                            }
-                            else {
-                                d3.select(this).classed('selected-rect', false);
-                            }
-                            // Unselect all days
-                            d3.selectAll('.day').attr({ 'stroke': DATE_UNSELECTED_COLOR })
-                            // Select all rects with selected-rect class
-                            d3.selectAll('.selected-rect').attr({ 'stroke': DATE_SELECTED_COLOR })
-                                .each(function () {
-                                    // Move selection to front
-                                    this.parentNode.appendChild(this);
-                                });
-                        }
-                    });
-
-                }
-                // Month Zoom Specific
-                if (ZoomLevel.MONTH == self.stateManager.getZoomLevel()) {
-                    // Insure Day Numbers are rendered first
-                    self.calendarContainerGroup.selectAll('.dayNumberBox').each(function () {
-                        // Move selection to front
-                        this.parentNode.appendChild(this);
-                    })
-                    self.calendarContainerGroup.selectAll('.dayNumber').each(function () {
-                        // Move selection to front
-                        this.parentNode.appendChild(this);
-                    })
-
-                    let selectedRectsInMonth = d3.selectAll('.selected-rect');
-                    if (selectedRectsInMonth[0].length == 0) {
-                        self.stateManager.selectMonth(self.viewModel, self.stateManager.getSelectedMonth(), self.stateManager.getSelectedYear());
-                    }
-                }
-            });
         }
 
         /**
@@ -554,48 +449,10 @@ module powerbi.extensibility.visual {
 
             dataPointRects.exit().remove();
 
-            this.addDrillDownSelections(this.viewModel.drillDownDataPoints);
+            this.stateManager.addDrillDownSelections(this.calendarContainerGroup, this.viewModel.drillDownDataPoints);
             this.tooltipServiceWrapper.addTooltip(this.calendarContainerGroup.selectAll('.calendarPoint'),
                 (tooltipEvent: TooltipEventArgs<DateDataPoint>) => getDrillDownTooltipData(tooltipEvent.data),
                 (tooltipEvent: TooltipEventArgs<DateDataPoint>) => tooltipEvent.data.selectionId);
-        }
-
-        /**
-         * Adds selection capabilities to each data point on a drill dwon view.
-         * @method @private
-         * @param {DateDataPoint} dataPoints    -data points to add selection capabilities to
-         */
-        private addDrillDownSelections(dataPoints: DateDataPoint[]) {
-            // Add Selections
-            let self = this;
-            let yearRects = this.calendarContainerGroup.selectAll('.calendarPoint');
-            yearRects.on('click', function (d) {
-                // Check to see if previously selected
-                let isSelected = d3.select(this).attr("stroke") == DATE_UNSELECTED_COLOR.toString() ? false : true;
-                // Selection Power BI data points
-                self.selectionManager
-                    .select(d.selectionId)
-                    .then((ids: ISelectionId[]) => {
-                        d3.selectAll('.calendarPoint').classed('selected-rect', false).attr({
-                            'stroke': DATE_UNSELECTED_COLOR
-                        });
-                        if (!isSelected) {
-                            d3.select(this).classed('selected-rect', true).attr({
-                                'stroke': DATE_SELECTED_COLOR
-                            }).each(function () {
-                                // Move selection to front
-                                this.parentNode.appendChild(this);
-                            });
-                        }
-                        else {
-                            d3.select(this).classed('selected-rect', false);
-                        }
-                        self.calendarContainerGroup.selectAll('.calendarPointLabel').each(function () {
-                            // Move selection to front
-                            this.parentNode.appendChild(this);
-                        })
-                    });
-            });
         }
 
         /**
@@ -651,7 +508,7 @@ module powerbi.extensibility.visual {
             d3.selectAll('rect').classed('selected-rect', false).attr({
                 'stroke': DATE_UNSELECTED_COLOR
             });
-            this.selectionManager.clear();
+            this.stateManager.clearSelections();
         }
     }
 }

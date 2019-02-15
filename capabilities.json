@@ -25,6 +25,7 @@
             "tooltips"
         ]
     },
+    "supportsLandingPage": true,
     "dataViewMappings": [
         {
             "conditions": [
