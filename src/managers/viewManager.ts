@@ -30,7 +30,6 @@ module powerbi.extensibility.visual {
          * @param {VisualUpdateOptions} options -Contains references to the size of the container and the dataView which contains
          *                                      all the data the visual had queried
          * @param {CalendarViewModel} viewModel -view model for the calendar visual 
-         * @param selectionManager 
          */
         renderCalendar(options: VisualUpdateOptions, viewModel: CalendarViewModel) {
             this.calendarSVG.remove();

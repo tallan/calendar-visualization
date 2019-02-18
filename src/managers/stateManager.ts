@@ -40,7 +40,6 @@ module powerbi.extensibility.visual {
                 console.log(idkeyex);
                 console.log(datakeyex);
                 console.log(idkeyex == datakeyex);
-                debugger;
                 let d = d3.selectAll('.day')
                     .filter((data: DataPoint) => ids.some(id => data.selectionId.getKey() == JSON.stringify(id["dataMap"]) + '[]'))
                     .classed('selected-rect', true)
@@ -48,16 +47,6 @@ module powerbi.extensibility.visual {
                     .each(function () {
                         this.parentNode.appendChild(this);
                     });
-
-
-                // selects all tiles.... how do we filter to only selected???
-                // d3.selectAll('.day')
-                // .attr({
-                //     'stroke': DATE_SELECTED_COLOR
-                // }).each(function () {
-                //     // Move selection to front
-                //     this.parentNode.appendChild(this);
-                // });
                 this.isBookmark = true;
                 console.log(this.isBookmark);
             });
@@ -112,7 +101,7 @@ module powerbi.extensibility.visual {
             let selectedIds: ISelectionId[] = [];
             let singleSelect = false;
             let dayRects = calendarContainerGroup.selectAll('.day');
-
+            console.log(dayRects);
             dayRects.on('click', function (d: CalendarDataPoint) {
                 let wasMultiSelect = d3.selectAll('.selected-rect').size() > 1;
                 let minShift = d.date;

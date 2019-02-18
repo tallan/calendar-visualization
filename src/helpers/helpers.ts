@@ -13,7 +13,6 @@ module powerbi.extensibility.visual {
         if (isDrillDown) {
             let categories = dataViews[0].categorical.categories[0];
             let categoryArray = categories.values as string[];
-
             // All arrays should be the same
             let length = dataViews[0].categorical.values[0].values.length;
             for (let i = 0; i < length; i++) {
@@ -42,6 +41,7 @@ module powerbi.extensibility.visual {
      * @returns {CalendarDataPoint[]}       -calendar data points
      */
     export function getDayDataPoints(dates: Date[], values: number[], viewModel: CalendarViewModel, options: VisualUpdateOptions, host: IVisualHost): CalendarDataPoint[] {
+        debugger;
         let calendarDataPoints: CalendarDataPoint[] = [];
         // Get Minimum and Maximum Values and dates
         let minValue = d3.min(values, function (d) { return d; });
@@ -52,42 +52,44 @@ module powerbi.extensibility.visual {
         viewModel.maximumDate = new Date(maxDateDataPoint.getFullYear(), maxDateDataPoint.getMonth() + 1, 0);
         let maxRangeDate = new Date(maxDateDataPoint.getFullYear(), maxDateDataPoint.getMonth() + 1, 1);
         let timeSpan: Date[] = d3.time.day.range(viewModel.minimumDate, maxRangeDate);
-        let difference: Date[] = differenceOfArrays(dates, timeSpan);
-
         // setup colors for each date depending on configurations
         let color = getColorFromValues(minValue, maxValue, viewModel.configurations);
 
-        // Set Data Points from Power BI
-        for (let i = 0; i < dates.length; i++) {
-            const selectionId: visuals.ISelectionId = host.createSelectionIdBuilder()
-                .withCategory(options.dataViews[0].categorical.categories[0], i)
+        let date = 0;
+        for (let tsDate = 0; tsDate < timeSpan.length; tsDate++) {
+            
+            console.log(tsDate);
+            const selectionId = host.createSelectionIdBuilder()
+                .withCategory(options.dataViews[0].categorical.categories[0], tsDate)
                 .createSelectionId();
-            const dataPoint: CalendarDataPoint = {
-                color: color(values[i]),
-                date: dates[i],
-                value: values[i],
-                selectionId: selectionId,
-                month: dates[i].getMonth(),
-                year: dates[i].getFullYear(),
-                selected: false
-            };
-            calendarDataPoints.push(dataPoint);
+            if (date < dates.length && timeSpan[tsDate].toDateString() == dates[date].toDateString()) {
+                console.log(date);
+                const dataPoint: CalendarDataPoint = {
+                    color: color(values[date]),
+                    date: dates[date],
+                    value: values[date],
+                    selectionId: selectionId,
+                    month: dates[date].getMonth(),
+                    year: dates[date].getFullYear()    
+                };
+                date++;  
+                calendarDataPoints.push(dataPoint);
+                console.log(dataPoint);
+            }
+            else {
+                const dataPoint: CalendarDataPoint = {
+                    color: color(0),
+                    date: timeSpan[tsDate],
+                    value: 0,
+                    selectionId: selectionId,
+                    month: timeSpan[tsDate].getMonth(),
+                    year: timeSpan[tsDate].getFullYear()
+                };
+                calendarDataPoints.push(dataPoint);
+                console.log(dataPoint);
+            }
         }
-
-        // Add Zero Value Date Points
-        for (let i = 0; i < difference.length; i++) {
-            let differenceDate = new Date(difference[i].toString());
-            const dataPoint: CalendarDataPoint = {
-                color: color(0),
-                date: differenceDate,
-                value: 0,
-                selectionId: null,
-                month: differenceDate.getMonth(),
-                year: differenceDate.getFullYear(),
-                selected: false
-            };
-            calendarDataPoints.push(dataPoint);
-        }
+        console.log(calendarDataPoints);
         return calendarDataPoints;
     }
 
@@ -124,8 +126,7 @@ module powerbi.extensibility.visual {
                 color: color(value),
                 index: i + 1,
                 selectionId: selectionId,
-                label: label,
-                selected: false
+                label: label
             });
         }
         return dataPoints;

@@ -20,7 +20,6 @@ module powerbi.extensibility.visual {
      * @interface
      */
     export interface DataPoint {
-        selected: boolean;
         color: string;
         value: number;
         selectionId: visuals.ISelectionId;
