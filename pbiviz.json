@@ -4,12 +4,12 @@
     "displayName": "Calendar by Tallan",
     "guid": "CalendarVisualA45056645E4E428B9D26EF971839A6B5",
     "visualClassName": "Visual",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "description": "A standard calendar layout that filters and aggregates data across a range of dates.",
     "supportUrl": "https://www.tallan.com/custom-technology/power-bi-support-services/",
     "gitHubUrl": "https://github.com/tallan/calendar-visualization"
   },
-  "apiVersion": "2.3.0",
+  "apiVersion": "2.6.0",
   "author": {
     "name": "Tallan, Inc.",
     "email": "powerbi.support@tallan.com"
@@ -22,10 +22,10 @@
     "node_modules/powerbi-visuals-utils-dataviewutils/lib/index.js",
     "node_modules/powerbi-visuals-utils-typeutils/lib/index.js",
     "node_modules/powerbi-visuals-utils-svgutils/lib/index.js",
-    "node_modules/powerbi-visuals-utils-interactivityutils/lib/index.js"
+    "node_modules/powerbi-visuals-utils-interactivityutils/lib/index.js",
+    "src/wrappers.js"
   ],
   "style": "style/visual.less",
   "capabilities": "capabilities.json",
-  "dependencies": "dependencies.json",
   "stringResources": []
 }
